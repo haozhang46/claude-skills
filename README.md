@@ -1,28 +1,55 @@
 # hz-skills
 
-Personal Claude Code skill collection — 30+ skills covering React, Next.js, TypeScript, Three.js, Zustand, and engineering workflow.
+Personal Claude Code skill collection — 36+ skills covering React, Next.js, TypeScript, Three.js, Security, DevOps, and engineering workflow.
 
-## Custom Skills (12)
+## Custom Skills (18)
 
+### Frontend Core
 | Skill | Purpose |
 |-------|---------|
-| **bem-class-names-only** | BEM semantic naming, Tailwind `@apply` in CSS, `classnames`/`clsx` for conditionals, no `&` nesting |
-| **nextjs-hydration-rules** | 7 hydration safety rules — browser APIs, time/random, list keys (uuid), ClientOnly pattern |
+| **react-fe-skill** | 11 rules — component design, named hooks, splitting, hook vs util, context+reducer+selector, state management, immutability+immer, ErrorBoundary, Suspense, dynamic render, forwardRef ban, cloneElement ban |
+| **react-best-practices** | Vercel — 45+ React/Next.js performance rules |
+| **nextjs-hydration-rules** | 7 hydration safety rules — browser APIs, time/random, list keys (uuid), ClientOnly |
 | **dto-mapper-layer** | Mapper/DTO transform BEFORE committing API data to state |
-| **react-fe-skill** | 11 rules — component design review, named hooks, splitting, hook vs util, useContext+useReducer+useSelector, state management decision tree, immutability + immer, ErrorBoundary, Suspense, dynamic render, forwardRef avoidance, cloneElement ban |
-| **js-coding-conventions** | 13 rules — `?.`/`??`, flat conditionals, early return, flags, Map/Set/WeakMap/WeakSet, promise catch, function arguments, cloneDeep limits, class get/set, recursion guard, Object.freeze, immutability |
-| **ts-conventions** | 7 rules — atomic global types, compose, centralized enums + useGetEnum, type guards, as const, prefer type over interface |
-| **axios-fetch-conventions** | No raw fetch/axios in React, unified instance, interceptors, cancellation, retry |
-| **lodash-conventions** | lodash-es, ES native replaces lodash, `flow` over long chains, deepSet/deepPick utils |
 | **ahooks-best-practices** | useMemoizedFn > useCallback, useDebounceFn, useEventListener, useLocalStorageState |
-| **react-coding-conventions** | Named hook functions (migrated to react-fe-skill) |
+
+### JavaScript / TypeScript
+| Skill | Purpose |
+|-------|---------|
+| **js-coding-conventions** | 13 rules — `?.`/`??`, flat conditionals, early return, flags, Map/Set/WeakMap, promise catch, function args, cloneDeep, class get/set, recursion guard, Object.freeze |
+| **ts-conventions** | 7 rules — atomic global types, compose, centralized enums+useGetEnum, type guards, as const |
+| **lodash-conventions** | lodash-es, ES native > lodash, `flow` over chains, deepSet/deepPick utils |
+
+### CSS / Styling
+| Skill | Purpose |
+|-------|---------|
+| **bem-class-names-only** | BEM naming, Tailwind `@apply` in CSS, `classnames`/`clsx`, no `&` nesting, husky enforcement |
+
+### Data Fetching
+| Skill | Purpose |
+|-------|---------|
+| **axios-fetch-conventions** | No raw fetch in React, httpOnly cookie via withCredentials, interceptors, cancellation, retry, SSE+generator streaming, blob download, Range chunked, responseType |
+
+### Tooling / Workflow
+| Skill | Purpose |
+|-------|---------|
+| **git-commit-conventions** | Conventional commits, husky+lint-staged, prettier+eslint flat config, commitlint, lock file rules |
+| **build-tooling** | Vite/Webpack HMR optimization, env files, per-environment config |
+| **monorepo-conventions** | pnpm workspaces, git submodule usage, shared package rules, Turborepo |
+| **project-ai-context** | CLAUDE.md / AGENTS.md structure, what goes in file vs skill |
+
+### Cross-Cutting
+| Skill | Purpose |
+|-------|---------|
+| **fe-security** | XSS, CSRF, CSP, httpOnly cookie, CORS, dependency audit, input/output sanitization |
+| **i18n-conventions** | next-intl, ICU message format, locale routing, translation file structure |
 
 ## Third-Party Skills (via `./install.sh`)
 
-### React / Next.js / State
+### React / State / Design
 | Skill | Source | Content |
 |-------|--------|---------|
-| **vercel-react-best-practices** | Vercel Engineering | 45+ rules for React/Next.js |
+| **vercel-react-best-practices** | Vercel | 45+ React/Next.js rules |
 | **web-design-guidelines** | Vercel | 247 design heuristics |
 | **zustand-patterns** | yonatangross/orchestkit | Zustand 5.x — slices, Immer, useShallow, middleware |
 | **react-native-best-practices** | callstackincubator | RN performance — JS, Native, Bundling |
@@ -40,16 +67,7 @@ Personal Claude Code skill collection — 30+ skills covering React, Next.js, Ty
 | Skill | Source | Content |
 |-------|--------|---------|
 | **threejs** | mrgoonie | Mega-skill, 5 levels |
-| **threejs-fundamentals** | CloudAI-X | Scene, cameras, renderer |
-| **threejs-geometry** | CloudAI-X | BufferGeometry, instancing |
-| **threejs-materials** | CloudAI-X | PBR, shader materials |
-| **threejs-lighting** | CloudAI-X | Lights, shadows |
-| **threejs-textures** | CloudAI-X | UV, env maps |
-| **threejs-animation** | CloudAI-X | Keyframe, skeletal |
-| **threejs-loaders** | CloudAI-X | GLTF/GLB loading |
-| **threejs-shaders** | CloudAI-X | GLSL, ShaderMaterial |
-| **threejs-postprocessing** | CloudAI-X | EffectComposer, bloom |
-| **threejs-interaction** | CloudAI-X | Raycasting, controls |
+| **threejs-fundamentals…interaction** | CloudAI-X | 10 specialized Three.js skills |
 | **webgpu-threejs-tsl** | dgreenheck | WebGPU + TSL shaders |
 
 ### Workflow
@@ -62,12 +80,12 @@ Personal Claude Code skill collection — 30+ skills covering React, Next.js, Ty
 ```bash
 git clone https://github.com/haozhang46/hz-skills.git
 cd hz-skills
-./install.sh  # fetch all 18 third-party skills
+./install.sh  # fetch 18 third-party skills
 cp -r . your-project/.claude/skills/
 ```
 
-Third-party skills are managed via `sources.yaml` + `install.sh` rather than committed directly — keeps the repo lean and upstream-updateable.
+Third-party skills managed via `sources.yaml` + `install.sh` — not committed directly, upstream-updateable.
 
 ## About
 
-Built test-driven (RED-GREEN-REFACTOR via subagent baseline testing) alongside my personal blog project. Each custom skill addresses a real convention gap. 30+ skills covering the full React/Next.js/TypeScript/Three.js stack.
+Built test-driven (RED-GREEN-REFACTOR via subagent baseline testing) alongside my personal blog project. 36+ skills covering the full modern frontend stack — from React component design to Three.js shaders, from git hooks to CSP headers.
