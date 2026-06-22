@@ -170,6 +170,40 @@ Large team, complex middleware, time-travel debugging?
 
 **Key rule:** Never jump to a state library because "we might need it later." Start with `useContext`, extract to Zustand when the context re-render problem actually bites.
 
+### Immutability — When Required, When Not
+
+| Library | Needs immutability? | Why |
+|---------|---------------------|-----|
+| **Redux** | Always | `connect` / `useSelector` does `===` reference check. Mutate = no re-render |
+| **Zustand** | Always | Same — shallow compare by default. `set((s) => ({ ...s, key: val }))` |
+| **useState** objects/arrays | Always | `setState` only triggers re-render if reference changes |
+| **useContext + useReducer** | Always | Reducer must return new reference for changes |
+
+```ts
+// ✅ immutable update
+set((s) => ({ ...s, count: s.count + 1 }));
+dispatch({ type: 'INC' }); // reducer returns new state
+
+// ❌ mutate in place — NO re-render
+state.count += 1;
+set(state); // same reference — zustand skips
+```
+
+**When you DON'T need immutability:**
+- Local variables in a function — no one is watching them
+- `useRef` — mutable by design, `.current` is meant to be mutated
+- Temporary computation before returning new state — mutate a draft, return the result
+- `immer` wrapped stores — immer makes "mutate" safe by proxying
+
+```ts
+// ✅ OK to mutate — useRef is designed for it
+const countRef = useRef(0);
+countRef.current += 1; // fine, no re-render triggered
+
+// ✅ OK — immer wraps the mutation
+set(immer((s) => { s.count += 1; }));
+```
+
 ## 7. Error Boundaries — Crash a Section, Not the Whole Page
 
 Wrap each logical section in its own ErrorBoundary. One component crashes → only that section shows fallback, the rest stays functional.
