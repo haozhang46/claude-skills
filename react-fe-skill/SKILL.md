@@ -1,33 +1,88 @@
 ---
 name: react-fe-skill
-description: Use when writing React components or hooks — enforces named hook functions, explicit returns, and other team conventions not covered by vercel-react-best-practices
+description: Use when writing React components or hooks — enforces named hook functions, component/hook splitting by cohesion, and team conventions not covered by vercel-react-best-practices
 ---
 
-# React Coding Conventions
+# React Frontend Conventions
 
-Team-specific React rules that complement `vercel-react-best-practices`.
+Team-specific React rules complementing `vercel-react-best-practices`.
 
-## Named Hook Functions
+## 1. Named Hook Functions
 
-All React hooks must use named functions. Anonymous arrow functions in hooks are forbidden.
+All React hooks must use named functions. Anonymous arrow functions forbidden.
 
 ```tsx
-// ❌ FORBIDDEN — anonymous
+// ❌ anonymous
 useEffect(() => { fetchData(); }, []);
-useCallback(() => { doThing(); }, []);
-useMemo(() => compute(items), [items]);
 
-// ✅ REQUIRED — named function
+// ✅ named
 useEffect(function syncScroll() { fetchData(); }, []);
-useCallback(function handleClick() { doThing(); }, []);
-useMemo(function countTotal() { return compute(items); }, [items]);
 ```
 
-**Why:**
-- Named functions appear in React DevTools profiler instead of "Anonymous"
-- Stack traces are readable — `syncScroll` vs `<anonymous>`
-- Self-documenting — the name says what the effect does
+## 2. Component Splitting — High Cohesion, Low Coupling
+
+**By scope:**
+
+```
+components/
+├── ParticleBackground.tsx    # global — used across multiple pages
+├── ScrollIndicator.tsx       # global
+├── PostHero.tsx              # page — only used in blog home
+├── PostListItem.tsx          # page
+```
+
+| Type | Location | Rule |
+|------|----------|------|
+| Global | `components/` | Used by 2+ pages or the root layout |
+| Page | `app/<page>/` colocated | Only used by one page |
+
+**By responsibility:** One component = one clear job. If you need "and" to describe what it does, split it.
+
+```tsx
+// ❌ too many responsibilities
+function PostCardAndChat() { ... }
+
+// ✅ single responsibility
+function PostCard() { ... }
+function ChatPanel() { ... }
+```
+
+## 3. Hook vs Util — The State Rule
+
+```
+Needs useState/useEffect/useRef? → Custom hook (useXxx)
+Pure computation / formatting?    → Util function (src/utils/)
+```
+
+```tsx
+// ❌ duplicate stateful logic in components
+function PageA() {
+  const [scroll, setScroll] = useState(0);
+  useEffect(() => { ... }, []);
+}
+function PageB() {
+  const [scroll, setScroll] = useState(0); // duplicated!
+  useEffect(() => { ... }, []);
+}
+
+// ✅ extract to custom hook
+function useScrollProgress() {
+  const [scroll, setScroll] = useState(0);
+  useEffect(() => { ... }, []);
+  return scroll;
+}
+
+// ✅ extract to util (no state)
+function formatPostDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+```
+
+| Has state / effects? | Extract to |
+|---------------------|------------|
+| Yes | `hooks/useXxx.ts` |
+| No | `lib/xxx.ts` or `utils/xxx.ts` |
 
 ## Why a Separate Skill
 
-`vercel-react-best-practices` is an upstream dependency. Team-specific conventions live here so the upstream skill stays updateable.
+`vercel-react-best-practices` is upstream. Team conventions live here so the upstream skill stays updateable.
