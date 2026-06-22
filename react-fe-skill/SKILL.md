@@ -299,6 +299,66 @@ function Page() {
 
 **Exception:** `forwardRef` is fine for DOM ref forwarding (`ref` to an `<input>` for focus management). Just don't use it to expose custom imperative methods.
 
+## 10. Dynamic Rendering — Conditional Components, Lazy Load, Registry
+
+**Conditional render — simple ternary or map:**
+
+```tsx
+// ✅ status → component map (strategy pattern)
+const VIEW_MAP = { loading: Skeleton, error: ErrorCard, empty: Empty, ready: PostList } as const;
+
+function Posts({ status }: { status: 'loading' | 'error' | 'empty' | 'ready' }) {
+  const View = VIEW_MAP[status];
+  return <View />;
+}
+```
+
+**Dynamic import — heavy component, load on demand:**
+
+```tsx
+// ✅ Next.js dynamic — component only loaded when rendered
+import dynamic from 'next/dynamic';
+const HeavyChart = dynamic(() => import('./Chart'), {
+  loading: () => <Skeleton />,
+  ssr: false, // if it uses window/DOM
+});
+```
+
+**Lazy — React built-in (no Next.js):**
+
+```tsx
+import { lazy, Suspense } from 'react';
+const Chart = lazy(() => import('./Chart'));
+<Suspense fallback={<Skeleton />}><Chart /></Suspense>
+```
+
+**Component Registry — render by name from data:**
+
+```tsx
+// ✅ registry pattern — data drives which component renders
+const BLOCK_RENDERER: Record<string, React.FC<Block>> = {
+  text: TextBlock,
+  image: ImageBlock,
+  code: CodeBlock,
+  embed: EmbedBlock,
+};
+
+function Article({ blocks }: { blocks: Block[] }) {
+  return blocks.map((b) => {
+    const Renderer = BLOCK_RENDERER[b.type] ?? FallbackBlock;
+    return <Renderer key={b.id} block={b} />;
+  });
+}
+```
+
+| Pattern | Use when |
+|---------|----------|
+| Ternary / `&&` | 2 states, simple |
+| Map object | 3+ states, static list of variants |
+| `dynamic()` | Next.js, heavy lib, SSR-skip |
+| `lazy()` + `Suspense` | Plain React, code-splitting |
+| Component registry | Data drives which component renders (CMS, block editor) |
+
 ## Why a Separate Skill
 
 `vercel-react-best-practices` is upstream. Team conventions live here so the upstream skill stays updateable.
