@@ -91,7 +91,49 @@ module.exports = {
 };
 ```
 
-## 5. package.json Scripts
+## 5. DLL — Don't Use, Obsolete
+
+Webpack DLL (`DllPlugin` + `DllReferencePlugin`) pre-compiled vendor bundles separately. **Webpack 5 made this obsolete.**
+
+```js
+// ❌ DLL — complex config, manual maintenance, no real benefit on Webpack 5
+// Separate webpack.dll.config.js
+// DllPlugin + DllReferencePlugin + separate build step
+// manual vendor list maintenance
+// inject via AddAssetHtmlPlugin
+```
+
+**Use instead (Webpack 5 built-in):**
+```js
+module.exports = {
+  cache: { type: 'filesystem' },     // replaces DLL — caches everything on disk
+  // Cache invalidates automatically on dep changes. Zero config beyond this line.
+};
+```
+
+**Or split via code-splitting — better than DLL:**
+```js
+module.exports = {
+  optimization: {
+    splitChunks: {
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          chunks: 'all',
+        },
+      },
+    },
+  },
+};
+```
+
+**Why DLL is dead:**
+- `cache: 'filesystem'` caches ALL modules, not just a manual vendor list
+- esbuild-loader/swc-loader makes rebuilds fast enough that DLL's speed gain is negligible
+- Code splitting via `splitChunks` achieves the same bundle separation without extra config
+
+## 6. package.json Scripts
 
 ```json
 {
