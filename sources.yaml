@@ -15,7 +15,63 @@ sources:
     path: skills/planning-with-files
     description: Persistent file-based planning — survives context loss and /clear
 
-  - name: superpowers
-    repo: https://github.com/anthropics/claude-code.git
-    path: plugins/cache/superpowers-marketplace/superpowers
-    description: Engineering workflow skills — brainstorming, TDD, code review, debugging, writing-plans, subagent-driven-development
+  # --- Three.js ---
+  - name: threejs
+    repo: https://github.com/mrgoonie/claudekit-skills.git
+    path: .claude/skills/threejs
+    description: Mega-skill — 5 levels from fundamentals to VR/XR
+
+  - name: threejs-fundamentals
+    repo: https://github.com/CloudAI-X/threejs-skills.git
+    path: skills/threejs-fundamentals
+    description: Scene setup, cameras, renderer, Object3D hierarchy
+
+  - name: threejs-geometry
+    repo: https://github.com/CloudAI-X/threejs-skills.git
+    path: skills/threejs-geometry
+    description: BufferGeometry, custom geometry, instancing
+
+  - name: threejs-materials
+    repo: https://github.com/CloudAI-X/threejs-skills.git
+    path: skills/threejs-materials
+    description: PBR, basic/phong/standard, shader materials
+
+  - name: threejs-lighting
+    repo: https://github.com/CloudAI-X/threejs-skills.git
+    path: skills/threejs-lighting
+    description: Light types, shadows, environment lighting
+
+  - name: threejs-textures
+    repo: https://github.com/CloudAI-X/threejs-skills.git
+    path: skills/threejs-textures
+    description: UV mapping, environment maps, render targets
+
+  - name: threejs-animation
+    repo: https://github.com/CloudAI-X/threejs-skills.git
+    path: skills/threejs-animation
+    description: Keyframe, skeletal, morph targets
+
+  - name: threejs-loaders
+    repo: https://github.com/CloudAI-X/threejs-skills.git
+    path: skills/threejs-loaders
+    description: GLTF/GLB, texture loading, async patterns
+
+  - name: threejs-shaders
+    repo: https://github.com/CloudAI-X/threejs-skills.git
+    path: skills/threejs-shaders
+    description: GLSL, ShaderMaterial, uniforms, custom effects
+
+  - name: threejs-postprocessing
+    repo: https://github.com/CloudAI-X/threejs-skills.git
+    path: skills/threejs-postprocessing
+    description: EffectComposer, bloom, DOF, screen effects
+
+  - name: threejs-interaction
+    repo: https://github.com/CloudAI-X/threejs-skills.git
+    path: skills/threejs-interaction
+    description: Raycasting, controls, mouse/touch input
+
+  - name: webgpu-threejs-tsl
+    repo: https://github.com/dgreenheck/webgpu-claude-skill.git
+    path: skills/webgpu-threejs-tsl
+    description: Three.js WebGPU + TSL shader development

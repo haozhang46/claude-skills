@@ -1,2 +1,16 @@
 # Third-party skills installed by install.sh
 vercel-react-best-practices/
+web-design-guidelines/
+planning-with-files/
+threejs/
+threejs-fundamentals/
+threejs-geometry/
+threejs-materials/
+threejs-lighting/
+threejs-textures/
+threejs-animation/
+threejs-loaders/
+threejs-shaders/
+threejs-postprocessing/
+threejs-interaction/
+webgpu-threejs-tsl/
