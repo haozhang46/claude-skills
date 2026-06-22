@@ -83,6 +83,31 @@ function formatPostDate(iso: string): string {
 | Yes | `hooks/useXxx.ts` |
 | No | `lib/xxx.ts` or `utils/xxx.ts` |
 
+## 4. State Management — When to Use What
+
+```
+Component local state?
+  → useState / useReducer
+
+Shared by 2-5 components in same subtree?
+  → useContext + custom hook wrapping it
+
+Shared across pages, or 6+ consumers, or needs outside-React access?
+  → Zustand (lightweight, selector-based, no boilerplate)
+
+Large team, complex middleware, time-travel debugging?
+  → Redux Toolkit
+```
+
+| Tool | Use when |
+|------|----------|
+| `useState` | Local to one component |
+| `useContext` | Few consumers, same subtree, simple get/set |
+| **Zustand** | App-wide, many consumers, outside React, selectors |
+| Redux | Rare — only if the team/project already uses it |
+
+**Key rule:** Never jump to a state library because "we might need it later." Start with `useContext`, extract to Zustand when the context re-render problem actually bites.
+
 ## Why a Separate Skill
 
 `vercel-react-best-practices` is upstream. Team conventions live here so the upstream skill stays updateable.
