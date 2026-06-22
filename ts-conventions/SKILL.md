@@ -121,27 +121,8 @@ function PostFilter() {
 
 **Key rule:** Add enum → add labels in same commit. Hook doesn't take scattered label maps. Everything centralized.
 
-## 4. TS Replaces Lodash — Use Native Syntax
 
-Don't reach for lodash when TS/ES has it built-in:
-
-| Instead of | Use |
-|-----------|-----|
-| `_.pick(obj, ['a', 'b'])` | `const { a, b } = obj` |
-| `_.omit(obj, ['x'])` | `const { x: _, ...rest } = obj` |
-| `_.get(obj, 'a.b.c')` | `obj?.a?.b?.c` |
-| `_.isNil(x)` | `x == null` |
-| `_.isString(x)` | `typeof x === 'string'` |
-| `_.defaults(obj, d)` | `const merged = { ...d, ...obj }` |
-| `_.map(arr, fn)` | `arr.map(fn)` |
-| `_.filter(arr, fn)` | `arr.filter(fn)` |
-| `_.find(arr, fn)` | `arr.find(fn)` |
-| `_.some(arr, fn)` | `arr.some(fn)` |
-| `_.every(arr, fn)` | `arr.every(fn)` |
-
-Keep lodash for: `groupBy`, `keyBy`, `uniqBy`, `debounce`, `throttle`, `cloneDeep`, `merge`, `flow`.
-
-## 5. No `any` — Use `unknown`
+## 4. No `any` — Use `unknown`
 
 ```ts
 // ❌
@@ -154,7 +135,7 @@ function parse(data: unknown): Post {
 }
 ```
 
-## 6. Type Guards for External Data
+## 5. Type Guards for External Data
 
 Everything from API / localStorage needs runtime validation:
 
@@ -169,7 +150,7 @@ function isPost(data: unknown): data is Post {
 }
 ```
 
-## 7. Prefer `type` Over `interface` Unless Extending
+## 6. Prefer `type` Over `interface` Unless Extending
 
 ```ts
 // ✅ type — for unions, primitives, tuples
@@ -181,7 +162,7 @@ interface BasePost { id: string; title: string; }
 interface PostWithAuthor extends BasePost { author: User; }
 ```
 
-## 8. `as const` for Literal Inference
+## 7. `as const` for Literal Inference
 
 ```ts
 // ❌ type is string[]

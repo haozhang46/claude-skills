@@ -15,9 +15,25 @@ import _ from 'lodash';
 import { groupBy, map, filter } from 'lodash-es';
 ```
 
-## 2. TS Replacements → See ts-conventions
+## 2. ES/JS Already Has These — Don't Use Lodash
 
-TypeScript destructuring, optional chaining (`?.`), nullish coalescing (`??`), and spread replace many lodash methods. Those rules live in `ts-conventions` — not duplicated here.
+Modern JavaScript (ES6+) covers many lodash methods natively:
+
+| Instead of | Use | Since |
+|-----------|-----|-------|
+| `_.map(arr, fn)` | `arr.map(fn)` | ES5 |
+| `_.filter(arr, fn)` | `arr.filter(fn)` | ES5 |
+| `_.find(arr, fn)` | `arr.find(fn)` | ES6 |
+| `_.some(arr, fn)` | `arr.some(fn)` | ES5 |
+| `_.every(arr, fn)` | `arr.every(fn)` | ES5 |
+| `_.pick(obj, ['a','b'])` | `const { a, b } = obj` | ES6 |
+| `_.omit(obj, ['x'])` | `const { x: _, ...rest } = obj` | ES2018 |
+| `_.get(obj, 'a.b.c')` | `obj?.a?.b?.c` | ES2020 |
+| `_.isNil(x)` | `x == null` | — |
+| `_.defaults(obj, d)` | `{ ...d, ...obj }` | ES2018 |
+| `_.assign(obj, a, b)` | `Object.assign(obj, a, b)` or `{ ...obj, ...a, ...b }` | ES6/ES2018 |
+
+**Keep lodash for:** `groupBy`, `keyBy`, `uniqBy`, `debounce`, `throttle`, `cloneDeep`, `merge`, `flow` — these don't have concise native equivalents.
 
 ## 3. Lodash for Pipelines — Don't Hand-Write Reduce
 
