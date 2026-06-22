@@ -51,28 +51,33 @@ scroll-indicator__segment--active
 header--transparent
 ```
 
-## CSS Goes in Stylesheets
+## CSS Goes in Stylesheets — with Tailwind @apply
+
+HTML stays BEM-only. CSS uses Tailwind `@apply` to compose styles from design tokens:
 
 ```css
 /* ✅ globals.css, page.css, or component .module.css */
 
 .post-card {
-  border-left: 3px solid;
-  padding: 1rem 1.25rem;
-  margin-bottom: 1.25rem;
+  @apply border-l-[3px] px-5 py-3 mb-5;
+  border-color: #fff;
 }
 
 .post-card__title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #fff;
+  @apply text-[15px] font-bold text-white tracking-[-0.3px];
 }
 
 .post-card__date {
-  font-size: 9px;
-  color: #777;
+  @apply text-[9px] text-gray-500;
+}
+
+.post-card--featured {
+  @apply border-l-[3px];
+  border-color: #fff;
 }
 ```
+
+**Note:** The `bem-class-names-only` rule applies to HTML className only. `@apply` with Tailwind utilities inside CSS files is the intended pattern — it keeps the design system DRY while HTML stays semantic.
 
 ## Red Flags — Immediate STOPS
 
