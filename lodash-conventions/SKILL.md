@@ -35,28 +35,18 @@ Modern JavaScript (ES6+) covers many lodash methods natively:
 
 **Keep lodash for:** `groupBy`, `keyBy`, `uniqBy`, `debounce`, `throttle`, `cloneDeep`, `merge`, `flow` — these don't have concise native equivalents.
 
-## 3. Lodash for Pipelines — Don't Hand-Write Reduce
+## 3. Lodash for Pipelines — `flow` Over Long Chains
+
+**Threshold:** 3+ chained `.map().filter().reduce()` → switch to `flow`.
 
 ```ts
-// ❌ hand-written reduce — noisy, error-prone
-const byCategory = items.reduce((acc, item) => {
-  const key = item.category;
-  (acc[key] ??= []).push(item);
-  return acc;
-}, {} as Record<string, Item[]>);
-
-// ✅ lodash — declarative, one line
-const byCategory = groupBy(items, 'category');
-```
-
-```ts
-// ❌ hand-written transform
+// ❌ long method chain — hard to read, each step allocates an intermediate array
 const result = items
   .filter(i => i.active)
   .map(i => ({ ...i, score: i.count * 2 }))
   .reduce((acc, i) => { acc[i.id] = i.score; return acc; }, {});
 
-// ✅ lodash flow — pipeline of pure functions
+// ✅ flow — named steps, single pass, composable
 const result = flow(
   (arr) => filter(arr, 'active'),
   (arr) => map(arr, (i) => ({ ...i, score: i.count * 2 })),
@@ -64,6 +54,18 @@ const result = flow(
   (obj) => mapValues(obj, 'score')
 )(items);
 ```
+
+| Chain length | Use |
+|-------------|-----|
+| 1-2 steps | `.map().filter()` — fine, readable |
+| 3+ steps | `flow(...)` — cleaner, no intermediate arrays |
+| Any reduce in chain | `flow` + `groupBy`/`keyBy`/`mapValues` — don't hand-write reduce |
+
+**Why `flow` over chaining:**
+- No intermediate arrays allocated at each `.` — only one pass
+- Each step is a named function reference, testable independently
+- Reading order matches execution order (top → bottom)
+- `.reduce()` is the most common source of bugs in chains — `flow` replaces it with named lodash methods
 
 ## 4. Good Lodash Uses
 
