@@ -170,6 +170,50 @@ Large team, complex middleware, time-travel debugging?
 
 **Key rule:** Never jump to a state library because "we might need it later." Start with `useContext`, extract to Zustand when the context re-render problem actually bites.
 
+## 7. Error Boundaries — Crash a Section, Not the Whole Page
+
+Wrap each logical section in its own ErrorBoundary. One component crashes → only that section shows fallback, the rest stays functional.
+
+```tsx
+// ✅ section-level boundaries
+<ScrollSections>
+  <section id="posts">
+    <ErrorBoundary fallback={<p>Failed to load posts.</p>}>
+      <PostList />
+    </ErrorBoundary>
+  </section>
+  <section id="about">
+    <ErrorBoundary fallback={<p>About section crashed.</p>}>
+      <About />
+    </ErrorBoundary>
+  </section>
+</ScrollSections>
+```
+
+Use `react-error-boundary` — same API as class-based, but hooks-friendly:
+
+```tsx
+import { ErrorBoundary } from 'react-error-boundary';
+
+function PostList() {
+  return (
+    <ErrorBoundary
+      fallback={<p className="editorial-empty">Something went wrong.</p>}
+      onError={(err) => console.error(err)}
+    >
+      <Posts />
+    </ErrorBoundary>
+  );
+}
+```
+
+| Rule | Why |
+|------|-----|
+| One per logical section | Isolate crashes, don't take down the page |
+| `fallback` is a ReactNode | Match the design system, not a generic "Error!" text |
+| `onError` to log | Don't swallow errors silently |
+| NOT around every component | Only at meaningful boundaries (page sections, feature blocks) |
+
 ## Why a Separate Skill
 
 `vercel-react-best-practices` is upstream. Team conventions live here so the upstream skill stays updateable.
