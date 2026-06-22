@@ -227,6 +227,37 @@ onClick={async () => { await submit(); }}
 onClick={async () => { try { await submit(); } catch (err) { setError(err.message); } }}
 ```
 
+## 9. Function Arguments — Destructure, No `arguments`, Max 3
+
+```tsx
+// ❌ positional — unreadable at call site
+function createPost(title: string, content: string, published: boolean, authorId: string) {}
+createPost('Hello', '...', true, 'u-123'); // what does true mean?
+
+// ✅ destructured object — self-documenting
+function createPost({ title, content, published = false, authorId }: CreatePostParams) {}
+createPost({ title: 'Hello', content: '...', authorId: 'u-123' });
+```
+
+**Rules:**
+
+| Rule | Why |
+|------|-----|
+| Max 3 parameters | Beyond 3 → refactor to options object |
+| Destructure in signature | `{ a, b }` not `params.a` |
+| Defaults in destructure | `{ published = false }` not `params.published ?? false` |
+| Type the options object | `CreatePostParams` interface, not inline |
+| Never use `arguments` | Use rest params `...args` instead |
+| Boolean params → options object | `createPost({ published: true })` not `createPost(true)` |
+
+```tsx
+// ❌ arguments object — no type safety, no arrow function support
+function sum() { return Array.from(arguments).reduce((a, b) => a + b, 0); }
+
+// ✅ rest parameters
+function sum(...nums: number[]) { return nums.reduce((a, b) => a + b, 0); }
+```
+
 ## Red Flags
 
 - `await x()` without `try` above it — needs catch
