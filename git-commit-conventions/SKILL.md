@@ -61,6 +61,10 @@ pnpm exec commitlint --edit $1
 
 ## 3. Prettier — No Discussion on Formatting
 
+```bash
+pnpm add -D prettier prettier-plugin-tailwindcss
+```
+
 **.prettierrc:**
 ```json
 {
@@ -68,26 +72,67 @@ pnpm exec commitlint --edit $1
   "singleQuote": true,
   "trailingComma": "all",
   "printWidth": 100,
-  "tabWidth": 2
+  "tabWidth": 2,
+  "plugins": ["prettier-plugin-tailwindcss"]
 }
 ```
+
+**.prettierignore:**
+```
+.next
+dist
+node_modules
+pnpm-lock.yaml
+```
+
+`prettier-plugin-tailwindcss` auto-sorts Tailwind classes. Even with BEM, it sorts `@apply` directives in CSS.
 
 ## 4. ESLint — Catch Bugs, Not Bikeshed
 
 ```bash
-pnpm add -D eslint @eslint/js typescript-eslint
+pnpm add -D \
+  eslint @eslint/js \
+  typescript-eslint \
+  eslint-config-prettier \
+  eslint-plugin-react-hooks \
+  eslint-plugin-import
 ```
 
-Key rules to enforce beyond defaults:
-```json
-{
-  "rules": {
-    "no-console": "warn",
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
-    "@typescript-eslint/no-explicit-any": "error"
-  }
-}
+**`eslint.config.mjs`** (flat config):
+```js
+import js from '@eslint/js';
+import ts from 'typescript-eslint';
+import prettier from 'eslint-config-prettier';
+import reactHooks from 'eslint-plugin-react-hooks';
+import importPlugin from 'eslint-plugin-import';
+
+export default [
+  js.configs.recommended,
+  ...ts.configs.recommended,
+  prettier,
+  {
+    plugins: { 'react-hooks': reactHooks, import: importPlugin },
+    rules: {
+      'no-console': 'warn',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'error',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      'import/order': ['warn', { 'newlines-between': 'never', alphabetize: { order: 'asc' } }],
+    },
+  },
+];
 ```
+
+**Package breakdown:**
+
+| Package | Purpose |
+|---------|---------|
+| `eslint` + `@eslint/js` | Core + recommended rules |
+| `typescript-eslint` | TS parser + TS-specific rules |
+| `eslint-config-prettier` | Turns off ESLint rules that conflict with Prettier |
+| `eslint-plugin-react-hooks` | Rules of hooks + exhaustive deps |
+| `eslint-plugin-import` | Import ordering, duplicates, missing extensions |
 
 ## 5. commitlint — Enforce Format
 
