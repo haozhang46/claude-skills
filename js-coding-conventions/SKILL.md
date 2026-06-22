@@ -149,6 +149,47 @@ function createUser(type: 'admin' | 'member', email: string): User {
 }
 ```
 
+## 7. Map / Set / WeakMap / WeakSet — When to Use
+
+| Structure | Use when | Don't use when |
+|-----------|----------|----------------|
+| **Map** | Key-value pairs with non-string keys (objects, functions); need `size`; frequent add/delete; iteration order matters | Keys are always strings → plain `{}` |
+| **Set** | Unique values; `has()`/`delete()` performance; deduplication | Simple arrays with few items |
+| **WeakMap** | Key is an object, value is metadata; auto-GC when object is unreachable; private data | Need to iterate; need `size`; keys are primitives |
+| **WeakSet** | Track object membership without preventing GC; "has this object been seen?" | Need to iterate; storing primitives |
+
+```ts
+// ✅ Map — DOM node → state mapping
+const nodeStates = new Map<HTMLElement, { clicked: boolean }>();
+nodeStates.set(el, { clicked: true });
+nodeStates.get(el); // O(1), no string coercion
+
+// ✅ Set — deduplication
+const seen = new Set<string>();
+items.filter((i) => !seen.has(i.id) && seen.add(i.id));
+
+// ✅ WeakMap — attach private metadata to objects, auto-cleanup
+const metadata = new WeakMap<object, { createdAt: Date }>();
+function track(obj: object) { metadata.set(obj, { createdAt: new Date() }); }
+// obj gets GC'd → metadata entry disappears automatically
+
+// ✅ WeakSet — "was this object already processed?"
+const processed = new WeakSet<object>();
+function process(obj: object) {
+  if (processed.has(obj)) return;
+  processed.add(obj);
+}
+```
+
+| Scenario | Best choice |
+|----------|-------------|
+| Cache with object keys → auto-evict on GC | `WeakMap` |
+| Deduplicate array by value | `Set` |
+| Object → extra data (DOM elements, React refs) | `Map` |
+| Private per-instance data not on prototype | `WeakMap` |
+| "Already visited?" for graph/tree traversal | `WeakSet` or `Set` (depends on GC need) |
+| Simple config object with string keys | Plain `{}` — not Map |
+
 ## Red Flags
 
 - `a ? a.b.c : default` → `a?.b?.c ?? default`
