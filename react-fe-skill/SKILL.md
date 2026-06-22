@@ -7,7 +7,38 @@ description: Use when writing React components or hooks — enforces named hook 
 
 Team-specific React rules complementing `vercel-react-best-practices`.
 
-## 1. Named Hook Functions
+## 1. Component Design — Before Writing Code
+
+Before implementing, write a component breakdown:
+
+```
+Component: PostCard
+  Props: { post: PostCardDTO; index: number }
+  Responsibility: render a single post with left accent bar
+  Scope: page — only used in BlogHomeSections
+  Data flow: BlogHomeSections → useSWR → toPostCard[] → PostCard
+
+Component: PostHero
+  Props: { post: PostCardDTO }
+  Responsibility: expanded first post with excerpt
+  Scope: page — only used in BlogHomeSections
+  Data flow: same as PostCard
+
+Decision:
+  - PostCard + PostHero → DON'T merge (different layout, different responsibilities)
+  - PostCard → page-level, NOT global (only used by one page)
+```
+
+**Checklist before writing code:**
+
+1. List each component with its props type signature
+2. One sentence describing what it does (no "and")
+3. Page-level or global?
+4. Data source → which parent provides props → which child consumes them
+5. Can any components merge? (same data, same responsibility, only styling differs)
+6. Does any page component need promotion to global? (now used by 2+ pages)
+
+## 2. Named Hook Functions
 
 All React hooks must use named functions. Anonymous arrow functions forbidden.
 
@@ -19,7 +50,7 @@ useEffect(() => { fetchData(); }, []);
 useEffect(function syncScroll() { fetchData(); }, []);
 ```
 
-## 2. Component Splitting — High Cohesion, Low Coupling
+## 3. Component Splitting — High Cohesion, Low Coupling
 
 **By scope:**
 
@@ -47,7 +78,7 @@ function PostCard() { ... }
 function ChatPanel() { ... }
 ```
 
-## 3. Hook vs Util — The State Rule
+## 4. Hook vs Util — The State Rule
 
 ```
 Needs useState/useEffect/useRef? → Custom hook (useXxx)
@@ -83,7 +114,7 @@ function formatPostDate(iso: string): string {
 | Yes | `hooks/useXxx.ts` |
 | No | `lib/xxx.ts` or `utils/xxx.ts` |
 
-## 4. useContext + useReducer + useSelector
+## 5. useContext + useReducer + useSelector
 
 When `useContext` holds complex state, pair it with `useReducer` for predictable transitions and a custom `useSelector` to avoid full re-renders.
 
@@ -114,7 +145,7 @@ function PostList() {
 
 **Why not just useContext alone:** Every state change re-renders ALL consumers. `useReducer` + `useSelector` gives you Redux-like precision without a library.
 
-## 5. State Management — When to Use What
+## 6. State Management — When to Use What
 
 ```
 Component local state?
