@@ -1,0 +1,6 @@
+# Third-party skills — run ./install.sh to fetch them
+sources:
+  - name: vercel-react-best-practices
+    repo: https://github.com/vercel-labs/agent-skills.git
+    path: skills/react-best-practices
+    description: React and Next.js performance optimization from Vercel Engineering
