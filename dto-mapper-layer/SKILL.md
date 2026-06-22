@@ -1,6 +1,6 @@
 ---
 name: dto-mapper-layer
-description: Use when fetching data from any source (REST, GraphQL, etc.) before storing in state — enforces a mapper/DTO transform layer, never store raw response directly
+description: Use when fetching data from any source (REST, GraphQL, etc.) — enforce mapper/DTO transform BEFORE committing to state or passing to components, never store raw API response shapes
 ---
 
 # DTO Mapper Layer
