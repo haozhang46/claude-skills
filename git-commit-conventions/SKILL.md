@@ -145,9 +145,20 @@ pnpm add -D @commitlint/cli @commitlint/config-conventional
 export default { extends: ['@commitlint/config-conventional'] };
 ```
 
+## 6. Lock Files — Always Commit
+
+```
+pnpm-lock.yaml   → commit
+package-lock.json → commit
+yarn.lock        → commit
+```
+
+**Never `.gitignore` the lock file.** It guarantees CI, deploy, and every dev installs the exact same dependency tree.
+
 ## Red Flags
 
 - Commit without type prefix → husky should reject
 - `git commit --no-verify` to bypass hooks → fix the issue, don't skip
 - Prettier format change mixed with logic change → separate commits
 - ESLint warnings ignored → treat warnings as errors in CI
+- `pnpm-lock.yaml` in `.gitignore` → delete that line
