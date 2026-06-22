@@ -4,3 +4,18 @@ sources:
     repo: https://github.com/vercel-labs/agent-skills.git
     path: skills/react-best-practices
     description: React and Next.js performance optimization from Vercel Engineering
+
+  - name: web-design-guidelines
+    repo: https://github.com/vercel-labs/agent-skills.git
+    path: skills/web-design-guidelines
+    description: 247 design heuristics for layout, color, hierarchy from Vercel
+
+  - name: planning-with-files
+    repo: https://github.com/OthmanAdi/planning-with-files.git
+    path: skills/planning-with-files
+    description: Persistent file-based planning — survives context loss and /clear
+
+  - name: superpowers
+    repo: https://github.com/anthropics/claude-code.git
+    path: plugins/cache/superpowers-marketplace/superpowers
+    description: Engineering workflow skills — brainstorming, TDD, code review, debugging, writing-plans, subagent-driven-development
