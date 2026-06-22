@@ -116,6 +116,22 @@ Every selector must be a complete, searchable class name. No `&__`, `&--`, `&:`,
 - No mental compile step — see the class in HTML, find it in CSS immediately
 - `&` nesting hides the cascade and specificity problems
 
+## Conditional Class → classnames / clsx — No Template Ternaries
+
+```tsx
+// ❌ template ternary — unreadable, noisy
+<div className={`post-card ${featured ? 'post-card--featured' : ''} ${loading ? 'post-card--loading' : ''}`}>
+
+// ❌ inline ternary chain
+<div className={`post-card${featured ? ' post-card--featured' : ''}${loading ? ' post-card--loading' : ''}`}>
+
+// ✅ classnames / clsx — clean
+import cn from 'classnames';
+<div className={cn('post-card', { 'post-card--featured': featured, 'post-card--loading': loading })}>
+```
+
+Always use `classnames` or `clsx` for any conditional className. Template literals with ternaries are banned.
+
 ## Red Flags — Immediate STOPS
 
 - `flex`, `grid`, `p-4`, `m-2`, `gap-4` in className
