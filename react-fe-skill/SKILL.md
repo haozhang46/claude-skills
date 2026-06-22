@@ -83,7 +83,38 @@ function formatPostDate(iso: string): string {
 | Yes | `hooks/useXxx.ts` |
 | No | `lib/xxx.ts` or `utils/xxx.ts` |
 
-## 4. State Management — When to Use What
+## 4. useContext + useReducer + useSelector
+
+When `useContext` holds complex state, pair it with `useReducer` for predictable transitions and a custom `useSelector` to avoid full re-renders.
+
+```tsx
+// ✅ Context + Reducer + Selector pattern
+type State = { posts: Post[]; filter: string; loading: boolean };
+type Action = { type: 'SET_POSTS'; posts: Post[] } | { type: 'SET_FILTER'; filter: string };
+
+function postReducer(state: State, action: Action): State { ... }
+
+const PostCtx = createContext<{ state: State; dispatch: Dispatch<Action> }>(null!);
+
+// Custom selector — component only re-renders when its slice changes
+function useSelector<T>(selector: (s: State) => T): T {
+  const { state } = useContext(PostCtx);
+  const ref = useRef(selector(state));
+  const next = selector(state);
+  if (!Object.is(ref.current, next)) ref.current = next;
+  return ref.current;
+}
+
+// Usage in component — no re-render on unrelated state changes
+function PostList() {
+  const posts = useSelector(s => s.posts);
+  ...
+}
+```
+
+**Why not just useContext alone:** Every state change re-renders ALL consumers. `useReducer` + `useSelector` gives you Redux-like precision without a library.
+
+## 5. State Management — When to Use What
 
 ```
 Component local state?
