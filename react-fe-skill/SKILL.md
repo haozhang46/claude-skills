@@ -214,6 +214,47 @@ function PostList() {
 | `onError` to log | Don't swallow errors silently |
 | NOT around every component | Only at meaningful boundaries (page sections, feature blocks) |
 
+## 8. Suspense — Loading States Without `isLoading` Booleans
+
+Use `Suspense` to handle async boundaries declaratively. No manual `if (isLoading)` checks.
+
+```tsx
+// ❌ manual loading flag — every component repeats this pattern
+function Posts() {
+  const { data, isLoading } = useSWR('/api/posts', fetcher);
+  if (isLoading) return <Skeleton />;
+  return <PostList posts={data} />;
+}
+
+// ✅ Suspense — loading lives at the boundary, component stays clean
+function Posts() {
+  const { data } = useSWR('/api/posts', fetcher, { suspense: true });
+  return <PostList posts={data} />; // no isLoading check!
+}
+
+// Parent wraps with Suspense + fallback
+<Suspense fallback={<PostListSkeleton />}>
+  <Posts />
+</Suspense>
+```
+
+Pair with ErrorBoundary for complete async state coverage:
+
+```tsx
+<ErrorBoundary fallback={<p>Failed</p>}>
+  <Suspense fallback={<Skeleton />}>
+    <Posts />
+  </Suspense>
+</ErrorBoundary>
+// ↑ loading → Skeleton, error → Failed, success → Posts
+```
+
+| Pattern | Use |
+|---------|-----|
+| `if (isLoading)` in component | Simple, one-off — fine for small components |
+| `Suspense` at page/section level | Multiple async components, want clean component code |
+| `Suspense` + `ErrorBoundary` | Full coverage — loading + error handled declaratively |
+
 ## Why a Separate Skill
 
 `vercel-react-best-practices` is upstream. Team conventions live here so the upstream skill stays updateable.
