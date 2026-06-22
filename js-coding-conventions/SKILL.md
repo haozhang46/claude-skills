@@ -190,8 +190,47 @@ function process(obj: object) {
 | "Already visited?" for graph/tree traversal | `WeakSet` or `Set` (depends on GC need) |
 | Simple config object with string keys | Plain `{}` — not Map |
 
+## 8. Every Promise Must Handle Rejection
+
+No uncaught promises. Every `await`/`.then()` must have a corresponding catch or try/catch.
+
+```tsx
+// ❌ uncaught — silent failure, swallowed error
+await fetchPosts();
+fetch('/api/posts').then(r => r.json());
+
+// ✅ try/catch
+try {
+  await fetchPosts();
+} catch (err) {
+  console.error('Failed to fetch posts', err);
+}
+
+// ✅ .catch()
+fetch('/api/posts')
+  .then(r => r.json())
+  .catch(err => console.error('Failed', err));
+
+// ✅ SWR/React Query handle errors internally — no manual catch needed
+const { data, error } = useSWR('/api/posts', fetcher);
+```
+
+**Exception:** Library-managed promises (SWR, React Query, ahooks useRequest) — they expose `error` in return value, no manual catch needed.
+
+**For async event handlers:** wrap the body in try/catch.
+
+```tsx
+// ❌ uncaught in event handler
+onClick={async () => { await submit(); }}
+
+// ✅
+onClick={async () => { try { await submit(); } catch (err) { setError(err.message); } }}
+```
+
 ## Red Flags
 
+- `await x()` without `try` above it — needs catch
+- `.then(r => r.json())` without `.catch` — unhandled rejection
 - `a ? a.b.c : default` → `a?.b?.c ?? default`
 - `&&` chain for property access → `?.`
 - `||` for defaults where `0`/`''`/`false` is valid → `??`
