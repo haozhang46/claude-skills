@@ -79,6 +79,48 @@ const result = flow(
 | `merge` | Deep object merge |
 | `flow` | Function pipeline |
 
+## 4. deepSet / deepPick — Without Immer
+
+When immer is overkill, two 10-line utilities handle 90% of deep state needs:
+
+```ts
+// deepSet — immutable nested set via path
+function deepSet<T>(obj: T, path: string, value: unknown): T {
+  const keys = path.split('.');
+  if (keys.length === 1) return { ...obj, [keys[0]]: value };
+  const [first, ...rest] = keys;
+  return { ...obj, [first]: deepSet((obj as any)[first] ?? {}, rest.join('.'), value) } as T;
+}
+
+deepSet(state, 'posts.u-123.meta.viewCount', state.posts['u-123'].meta.viewCount + 1);
+```
+
+```ts
+// deepPick — pick nested paths, return new object
+function deepPick<T extends Record<string, unknown>>(obj: T, paths: string[]): Partial<T> {
+  return paths.reduce((acc, path) => {
+    const keys = path.split('.');
+    let src: any = obj;
+    let dst = acc;
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!(keys[i] in src)) return acc;
+      dst[keys[i]] = dst[keys[i]] ?? {};
+      dst = dst[keys[i]];
+      src = src[keys[i]];
+    }
+    dst[keys[keys.length - 1]] = structuredClone(src[keys[keys.length - 1]]);
+    return acc;
+  }, {} as any);
+}
+```
+
+| Use util | Use immer |
+|----------|-----------|
+| 1-3 paths to update | Many different mutations in one handler |
+| Simple set/pick operations | Complex array insert/delete/filter inside nested state |
+| Zero-dependency preference | Already using immer in the project |
+| `produce()` overhead > utility | 3+ different nested updates in one pass |
+
 ## Red Flags
 
 - `import _ from 'lodash'` — use `lodash-es` tree-shakeable imports
