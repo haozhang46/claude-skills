@@ -15,18 +15,9 @@ import _ from 'lodash';
 import { groupBy, map, filter } from 'lodash-es';
 ```
 
-## 2. TypeScript Replaces Some Lodash
+## 2. TS Replacements → See ts-conventions
 
-When TS types are well-defined, skip these lodash methods:
-
-| Skip | Because |
-|------|---------|
-| `_.pick(obj, ['a', 'b'])` | `const { a, b } = obj` — destructure directly |
-| `_.omit(obj, ['x'])` | `const { x: _, ...rest } = obj` |
-| `_.get(obj, 'a.b.c')` | `obj?.a?.b?.c` — optional chaining |
-| `_.isString(x)` | `typeof x === 'string'` |
-| `_.isNil(x)` | `x == null` |
-| `_.defaults(obj, defaults)` | `const merged = { ...defaults, ...obj }` |
+TypeScript destructuring, optional chaining (`?.`), nullish coalescing (`??`), and spread replace many lodash methods. Those rules live in `ts-conventions` — not duplicated here.
 
 ## 3. Lodash for Pipelines — Don't Hand-Write Reduce
 
