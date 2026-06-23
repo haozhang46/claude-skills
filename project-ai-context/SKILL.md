@@ -132,15 +132,13 @@ fi
 
 ### CI/生产环境通过 API 拉取
 
-```yaml
-# CI 中：从 Secret Manager 拉取敏感值
-- name: Setup env
-  run: |
-    scripts/setup-env.sh
-    curl -s -H "Authorization: Bearer $CI_TOKEN" \
-      https://config.internal/api/env/production \
-      | jq -r 'to_entries | map("\(.key)=\(.value)") | .[]' > .env
-```
+CI 或部署脚本从内部 Secret Manager API 拉取敏感值，写入 `.env` 文件。`.env` 文件位置为项目根目录，与 `.env.example` 同级。
+
+**流程描述：**
+1. 运行 `scripts/setup-env.sh` 创建 `.env` 模板
+2. 调用内部 Config API 获取当前环境（dev/staging/production）的配置值
+3. 鉴权通过 CI 的环境变量（`CI_TOKEN`）传入
+4. 将 API 返回值写入 `.env`
 
 **初始化流程：**
 1. 新开发者 `git clone` → 运行 `scripts/setup-env.sh` → 复制 `.env.example` 为 `.env`
