@@ -1,6 +1,6 @@
 ---
 name: css-practices
-description: CSS 实践 — Grid vs Flexbox 选择、间距规范（gap / margin-bottom-only）、响应式断点、Tailwind 对应
+description: CSS 实践 — Grid vs Flexbox 选择、间距规范（gap / margin-bottom-only）、BEM 命名规范、响应式断点、Tailwind 对应
 ---
 
 # CSS 实践
@@ -325,6 +325,83 @@ module.exports = {
 
 > **Tailwind 直接用 responsive prefix 就行，不用自己写 CSS var。**
 > 只有在不用 Tailwind 的纯 CSS 项目里才需要手动定义断点变量。
+
+---
+
+## BEM 命名规范
+
+HTML 中只用语义化 BEM class name，所有样式写在 CSS 文件中（可通过 `@apply` 使用 Tailwind 工具类）。
+
+### 规则
+
+```html
+<!-- ❌ FORBIDDEN — Tailwind utility classes in HTML -->
+<div class="flex items-center gap-4 bg-gray-950 text-white p-6 rounded-lg">
+
+<!-- ❌ FORBIDDEN — arbitrary values -->
+<div class="bg-[#050505] text-[#999] max-w-[880px]">
+
+<!-- ✅ REQUIRED — BEM semantic names -->
+<div class="post-card">
+  <h2 class="post-card__title">Title</h2>
+  <p class="post-card__excerpt">Excerpt</p>
+</div>
+```
+
+### Block / Element / Modifier
+
+```
+Block:           header    post-card    scroll-indicator
+Element:         header__logo       post-card__title
+Modifier:        post-card--featured    header--transparent
+```
+
+### CSS 用 @apply
+
+```css
+.post-card {
+  @apply border-l-[3px] px-5 py-3 mb-5;
+  border-color: #fff;
+}
+.post-card__title {
+  @apply text-[15px] font-bold text-white;
+}
+```
+
+### Nesting — 必须写完整类名
+
+```css
+/* ✅ 允许 nesting，但必须写全类名 */
+.post-card {
+  @apply px-5 py-3;
+
+  .post-card__title {
+    @apply font-bold;
+  }
+}
+
+/* ❌ &__ 缩写 — 禁止（不可 grep） */
+.post-card {
+  &__title { @apply font-bold; }
+}
+
+/* ✅ & 伪类 — 允许（无全名形式） */
+.post-card {
+  &:hover { opacity: 0.8; }
+  &::after { content: ''; }
+}
+```
+
+### 条件类名 — clsx
+
+```tsx
+// ✅ clsx 替代模板三元
+import cn from 'classnames';
+<div className={cn('post-card', {
+  'post-card--featured': featured,
+  'post-card--loading': loading,
+})}>
+```
 
 ## Red Flags
 
