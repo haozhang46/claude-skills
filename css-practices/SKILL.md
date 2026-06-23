@@ -869,6 +869,87 @@ box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 | Tooltip 显示不全 | 父级 overflow: hidden | Tooltip 放 body 级或 popper 方案 |
 | z-index: 9999 无效 | 父级层叠上下文更低 | 检查父级 position + z-index |
 
+### z-index 具名规范
+
+**绝不在代码里直接写 `z-index: 123`**，所有 z-index 用 CSS 变量集中管理。
+
+```css
+/* ❌ 魔数 — 不可维护 */
+.header { z-index: 100; }
+.modal  { z-index: 999; }
+.tooltip { z-index: 9999; }
+/* 后来者不知道 100 是什么层，只能猜 */
+
+/* ✅ 全局 z-index 变量 — 具名、分层、可维护 */
+:root {
+  /* 层级阶梯 — 每层预留 10 个值空间 */
+  --z-base:          auto;       /* 默认层 */
+  --z-sticky:        10;         /* 粘性头部 */
+  --z-dropdown:      100;        /* 下拉菜单 */
+  --z-nav:           200;        /* 导航栏 */
+  --z-mask:          500;        /* 遮罩层 */
+  --z-modal:         600;        /* 弹窗 */
+  --z-tooltip:       700;        /* Tooltip / Popover */
+  --z-toast:         800;        /* Toast 通知 */
+  --z-loading:       900;        /* 全屏加载 */
+  --z-max:           99999;      /* 兜底最高层 */
+}
+```
+
+```css
+/* 使用时 */
+.header {
+  z-index: var(--z-sticky);
+}
+.modal-overlay {
+  z-index: var(--z-mask);
+}
+.modal-content {
+  z-index: var(--z-modal);
+}
+.tooltip {
+  z-index: var(--z-tooltip);
+}
+.toast {
+  z-index: var(--z-toast);
+}
+```
+
+**层级分配策略：**
+
+| 变量 | 值 | 用途 | 间隔 |
+|------|-----|------|------|
+| `--z-sticky` | 10 | 粘性头部、侧边栏 | — |
+| `--z-dropdown` | 100 | 下拉菜单、选择器 | 90 |
+| `--z-nav` | 200 | 固定导航栏 | 100 |
+| `--z-mask` | 500 | 遮罩/背景 | 300 |
+| `--z-modal` | 600 | 弹窗 | 100 |
+| `--z-tooltip` | 700 | 提示、Popover | 100 |
+| `--z-toast` | 800 | 消息通知 | 100 |
+| `--z-loading` | 900 | 全屏 Loading | 100 |
+
+> 预留足够间隔（至少 10），方便中间插入新层。不同项目可调整具体值，**关键是用变量名表达语义，而不是用数字猜层级**。
+
+```css
+/* Tailwind 中配置 */
+module.exports = {
+  theme: {
+    extend: {
+      zIndex: {
+        'sticky':   '10',
+        'dropdown': '100',
+        'nav':      '200',
+        'mask':     '500',
+        'modal':    '600',
+        'tooltip':  '700',
+        'toast':    '800',
+        'loading':  '900',
+      },
+    },
+  },
+};
+/* 用：<div class="z-modal"> */
+
 ---
 
 ## Red Flags
@@ -878,3 +959,4 @@ box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 - ❌ 最后一行不够数左对齐不对 — Grid 默认左对齐，Flexbox 需 flex-start + 空白占位
 - ❌ 多列用 Flexbox 然后手动算 `nth-child` 加 margin — Grid 的 `gap` 处理好了
 - ❌ 一维布局（导航栏）硬用 Grid — 过度设计，Flexbox 更简洁
+- ❌ `z-index: 123` 直接写魔数 — 必须用 CSS 变量具名管理，不然没人知道 123 是什么层
