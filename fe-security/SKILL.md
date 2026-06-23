@@ -1,6 +1,6 @@
 ---
 name: fe-security
-description: Use when implementing authentication, handling user input, configuring CORS/CSP, or reviewing frontend security — covers XSS, CSRF, token storage, CSP, clickjacking, and dependency auditing
+description: Use when implementing authentication, handling user input, configuring CORS/CSP, or reviewing frontend security — covers XSS, CSRF, token storage, CSP, clickjacking, IDOR, and dependency auditing
 ---
 
 # Frontend Security
@@ -99,6 +99,92 @@ encodeURIComponent(userInput)   // URL param
 DOMPurify.sanitize(userInput)   // HTML
 JSON.stringify(userInput)       // JSON (prevents injection in <script> tags)
 ```
+
+## 8. IDOR — URL 中 ID 的权限校验
+
+URL 里带 ID（`/api/orders/123`）本身不是问题，问题在于**后端有没有校验当前用户是否有权限访问这个 ID**。
+
+### 正确做法：后端校验（不是前端能控制的）
+
+```ts
+// ❌ 只查订单，不查归属
+app.get('/api/orders/:id', (req, res) => {
+  const order = db.query('SELECT * FROM orders WHERE id = ?', req.params.id);
+  res.json(order);
+});
+
+// ✅ 校验当前用户是否属于这个订单
+app.get('/api/orders/:id', (req, res) => {
+  const order = db.query(
+    'SELECT * FROM orders WHERE id = ? AND user_id = ?',  // ← 关键
+    req.params.id, req.user.id
+  );
+  if (!order) return res.status(403).json({ error: '无权访问' });
+  res.json(order);
+});
+```
+
+### ID 可预测时的额外防护
+
+即使有了权限校验，可预测的 ID（自增 1,2,3）在以下场景仍有风险：
+
+| 场景 | 风险 | 防护 |
+|------|------|------|
+| 订单列表 | 知道别人的订单号 | ✅ `WHERE user_id = ?` 已过滤 |
+| 用户公开资料 | ID 可遍历抓取 | 加频率限制（Rate Limit） |
+| 邀请链接 / 分享 | 猜别人 ID 看私密内容 | 用 UUID 替代自增 ID |
+
+### 防止 ID 遍历
+
+```ts
+// ❌ 自增 ID 可遍历
+/api/users/1
+/api/users/2
+/api/users/3  // 暴力猜
+
+// ✅ UUID 不可预测
+/api/users/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+// ✅ 或者加 Rate Limit
+app.use('/api/users/:id', rateLimit({
+  windowMs: 60 * 1000,   // 1 分钟
+  max: 10,                // 最多 10 次
+}));
+```
+
+### 常见误区
+
+```ts
+// ❌ 误区：前端把 ID 藏起来就安全了
+// 前端不显示 ID，但浏览器 DevTools Network 还是能看到请求
+
+// ❌ 误区：用 POST 代替 GET 来隐藏 ID
+// POST /api/order  body: { id: 123 }  → 同样暴露
+
+// ❌ 误区：前端加密 ID
+// 前端加密 → 后端解密 → 加密算法暴露在 JS 里 → 伪安全
+
+// ✅ 正确：后端永远校验权限，URL 里有没有 ID 不重要
+```
+
+### 三层防御
+
+```
+第一层：认证（你是谁）          → JWT / Session
+第二层：授权（你能做什么）      → WHERE user_id = ?
+第三层：限流（防止暴力遍历）    → Rate Limit
+```
+
+| 措施 | 解决什么问题 | 谁负责 |
+|------|------------|--------|
+| 权限校验 `WHERE user_id = ?` | 别人拿你的 ID 访问 | 后端 |
+| UUID 替代自增 ID | 防止 ID 被猜出来 | 后端 |
+| Rate Limit | 防止批量遍历 | 后端/Nginx |
+| 前端不暴露多余信息 | 减少攻击面 | 前端 |
+
+### 结论
+
+**URL 里有 ID 本身不是漏洞**（RESTful API 本来就长这样）。真正的漏洞是**后端没有校验当前用户是否有权访问这个 ID 对应的资源**。前端能做的只是辅助（不暴露多余信息），真正防线在后端。
 
 ## Red Flags
 
