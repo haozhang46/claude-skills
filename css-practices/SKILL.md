@@ -772,6 +772,105 @@ box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 | 头像 | 固定 | `width: 40px; height: 40px` |
 | 输入框 | 不设宽 | 父级宽度或 `width: 100%` |
 
+---
+
+## Position & z-index 层级
+
+### z-index 相同时：后面的覆盖前面的
+
+```html
+<div class="box box-1">盒子 1</div>
+<div class="box box-2">盒子 2（在后面，显示在上层）</div>
+```
+
+```css
+.box {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+}
+.box-1 { top: 0; left: 0; background: red; z-index: 1; }
+.box-2 { top: 20px; left: 20px; background: blue; z-index: 1; }
+/* z-index 相同 → box-2 在 DOM 后面，渲染在上层 */
+```
+
+**规则：** 同层 `z-index` 相同时，**DOM 中靠后的元素在上层**。所以如果想让某个元素在上层，可以：
+- 调整 DOM 顺序（简单但影响语义）
+- 或者给更大的 `z-index`
+
+### Stacking Context（层叠上下文）
+
+`z-index` 只在同一个层叠上下文中比较。不同上下文互不影响。
+
+```html
+<div class="parent-1">
+  <div class="child child-high">子元素 z-index: 999</div>
+</div>
+<div class="parent-2">
+  <div class="child child-low">子元素 z-index: 1</div>
+</div>
+```
+
+```css
+.parent-1 { position: relative; z-index: 1; }    /* 创建 Stacking Context */
+.parent-2 { position: relative; z-index: 2; }    /* 创建 Stacking Context */
+
+.child-high { position: absolute; z-index: 999; } /* 在 parent-1 内，最高也没用 */
+.child-low  { position: absolute; z-index: 1; }   /* 在 parent-2 内，z=1 也在上面 */
+/* parent-2 整体在 parent-1 上面 → child-low 在最上层 */
+```
+
+**`z-index: 999` 不一定比 `z-index: 1` 高** — 要看父级的层叠上下文顺序。
+
+### 哪些属性会创建 Stacking Context
+
+| 属性 | 说明 |
+|------|------|
+| `position: relative/absolute` + `z-index` 非 auto | 最常见 |
+| `position: fixed` / `sticky` | 自动创建 |
+| `opacity < 1` | 如 `opacity: 0.99` |
+| `transform` 非 none | 如 `transform: scale(1)` |
+| `filter` 非 none | 如 `filter: blur(0)` |
+| `will-change` | 浏览器预创建 |
+| `isolation: isolate` | **主动隔离（推荐）** |
+
+### 隔离层级：isolation: isolate
+
+```css
+/* ✅ 主动隔离：不需要 position + z-index 也能建上下文 */
+.popup {
+  isolation: isolate;    /* 创建独立 Stacking Context */
+  /* 内部 z-index 不会影响外部 */
+  /* 外部 z-index 也不影响内部 */
+}
+
+/* 适用场景：弹窗、下拉菜单、Tooltip 等需要独立层级的组件 */
+```
+
+### 常见问题
+
+```html
+<!-- ❌ 弹窗被遮住：弹窗的父级 z-index 比遮罩低 -->
+<div class="mask" style="z-index: 100">
+  <div class="modal" style="z-index: 999">弹窗</div>
+  <!-- modal 的 z-index 在 mask 上下文内 → 无效 -->
+</div>
+
+<!-- ✅ 弹窗和遮罩平级 -->
+<div class="mask" style="z-index: 100"></div>
+<div class="modal" style="z-index: 101">弹窗</div>
+<!-- 或 modal 用 isolation: isolate 独立 -->
+```
+
+| 场景 | 原因 | 解决 |
+|------|------|------|
+| 弹窗被遮罩挡住 | modal 嵌套在 mask 内部 | modal 和 mask 同级，z-index 更高 |
+| 下拉菜单被遮住 | 父级 z-index 低于其他元素 | isolation: isolate 或提升父级 z-index |
+| Tooltip 显示不全 | 父级 overflow: hidden | Tooltip 放 body 级或 popper 方案 |
+| z-index: 9999 无效 | 父级层叠上下文更低 | 检查父级 position + z-index |
+
+---
+
 ## Red Flags
 
 - ❌ 多列列表用 `flex-wrap` + `width: calc()` — 换 Grid 一行搞定
