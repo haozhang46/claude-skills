@@ -403,6 +403,102 @@ import cn from 'classnames';
 })}>
 ```
 
+---
+
+## 行内对齐方式 — inline / flex / block
+
+### display: inline
+
+行内元素**不能设宽高**，尺寸由内容决定。水平排列，换行才折行。
+
+```css
+/* inline 元素 */
+span, a, strong, em, img
+
+/* inline 对齐只需设父级 text-align */
+.parent {
+  text-align: center;   /* inline 元素水平居中 */
+  /* 垂直方向：line-height 控制 */
+  line-height: 48px;    /* 等于容器高度时垂直居中 */
+}
+```
+
+| 对齐方式 | 水平 | 垂直 |
+|---------|------|------|
+| 居中 | `text-align: center` | `line-height: 容器高度` |
+| 左对齐 | `text-align: left` | — |
+| 右对齐 | `text-align: right` | — |
+| 顶部对齐 | — | `vertical-align: top` |
+| 中间对齐 | — | `vertical-align: middle` |
+| 底部对齐 | — | `vertical-align: bottom` |
+
+### display: block
+
+块级元素默认占满父级宽度，每个占一行。
+
+```css
+/* block 水平居中 */
+.block {
+  width: 200px;               /* 必须设宽度 */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* block 垂直居中（需要父级是 flex） */
+.parent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+```
+
+### display: flex
+
+Flex 是**一维布局**，主轴对齐用 `justify-content`，交叉轴对齐用 `align-items`。
+
+```css
+.parent {
+  display: flex;
+  /* 主轴（默认水平）对齐 */
+  justify-content: center;     /* 居中 */
+  justify-content: space-between; /* 两端对齐 */
+  justify-content: flex-start; /* 左对齐（默认） */
+  justify-content: flex-end;   /* 右对齐 */
+
+  /* 交叉轴（默认垂直）对齐 */
+  align-items: center;         /* 垂直居中 */
+  align-items: stretch;        /* 拉伸填满（默认） */
+  align-items: flex-start;     /* 顶部 */
+  align-items: flex-end;       /* 底部 */
+}
+```
+
+| `justify-content` | 效果 |
+|-------------------|------|
+| `flex-start` | 左对齐（默认） |
+| `center` | 水平居中 |
+| `flex-end` | 右对齐 |
+| `space-between` | 两端对齐，中间等距 |
+| `space-around` | 每个元素左右间距相等 |
+| `space-evenly` | 所有间距完全相等 |
+
+### 选择决策
+
+```
+需求
+├── 行内文字居中 / 图片 + 文字一行
+│   └── inline + text-align / vertical-align
+├── 块级元素水平居中（定宽）
+│   └── block + margin: 0 auto
+├── 块级元素垂直居中
+│   └── flex + align-items: center
+├── 多个元素水平分布（导航、工具栏）
+│   └── flex + justify-content: space-between
+├── 列表 / 多列卡片
+│   └── grid + gap
+└── 绝对居中（水平和垂直）
+    └── flex + justify-content: center + align-items: center
+
 ## Red Flags
 
 - ❌ 多列列表用 `flex-wrap` + `width: calc()` — 换 Grid 一行搞定
