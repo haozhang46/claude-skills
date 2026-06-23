@@ -212,6 +212,9 @@ async chatStream(@Body() body: ChatDto, @Res() res: Response) {
 ```
 
 **Frontend — consume SSE with fetch + ReadableStream:**
+
+[more lines below; pass offset=229 to continue]
+
 ```ts
 async function* consumeSSE(url: string, body: unknown): AsyncGenerator<string> {
   const res = await fetch(url, {
@@ -258,3 +261,139 @@ async function handleSend(prompt: string) {
 | Chunked download (Range) | Large binary file, need progress + resume |
 
 **Key:** `for await (... of generator)` handles backpressure — consumer controls pace, server doesn't flood.
+
+---
+
+## 9. Request Queue — 防止重复与控制并发
+
+### 场景：重复请求合并
+
+同一个请求在短时间内被多次触发（如搜索输入、快速切换 Tab），只发一次，复用结果。
+
+```ts
+class RequestQueue {
+  private pending = new Map<string, Promise<any>>();
+
+  async enqueue<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    // 已有相同请求在途 → 复用
+    if (this.pending.has(key)) {
+      return this.pending.get(key)!;
+    }
+
+    // 发起请求，存入队列
+    const promise = fetcher().finally(() => {
+      this.pending.delete(key);
+    });
+    this.pending.set(key, promise);
+    return promise;
+  }
+}
+
+const queue = new RequestQueue();
+
+// 使用：连续调用 10 次也只发 1 次
+const data = await queue.enqueue('search:keyword', () =>
+  axios.get(`/api/search?q=keyword`).then(r => r.data)
+);
+```
+
+### 场景：取消上一次请求
+
+搜索框场景，每次输入取消上一次未完成的请求。
+
+```ts
+let cancelRef: AbortController | null = null;
+
+async function search(keyword: string) {
+  // 取消上一次请求
+  cancelRef?.abort();
+  cancelRef = new AbortController();
+
+  try {
+    const res = await axios.get('/api/search', {
+      params: { q: keyword },
+      signal: cancelRef.signal,
+    });
+    return res.data;
+  } catch (err) {
+    if (axios.isCancel(err)) {
+      console.log('上一次请求已取消');
+      return null;
+    }
+    throw err;
+  }
+}
+```
+
+### 场景：并发控制（限制同时请求数）
+
+```ts
+class ConcurrencyQueue {
+  private queue: (() => Promise<any>)[] = [];
+  private running = 0;
+
+  constructor(private maxConcurrency = 5) {}
+
+  async add<T>(task: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await task();
+          resolve(result);
+        } catch (e) {
+          reject(e);
+        }
+      });
+      this.run();
+    });
+  }
+
+  private run() {
+    while (this.running < this.maxConcurrency && this.queue.length > 0) {
+      const task = this.queue.shift()!;
+      this.running++;
+      task().finally(() => {
+        this.running--;
+        this.run();
+      });
+    }
+  }
+}
+
+// 使用：最多同时 3 个请求
+const q = new ConcurrencyQueue(3);
+const results = await Promise.all(
+  urls.map(url => q.add(() => axios.get(url).then(r => r.data)))
+);
+```
+
+### 各场景对比
+
+| 场景 | 方案 | 适用 |
+|------|------|------|
+| 搜索输入、重复点击 | 取消上一次（AbortController） | 只需最新结果 |
+| 搜索、页面 Tab 切换 | 重复请求合并（Map + Promise） | 相同请求复用一个结果 |
+| 批量上传、大量列表拉取 | 并发控制（ConcurrencyQueue） | 限制同时请求数 |
+| 请求失败自动重试 | 重试队列（指数退避） | 临时性故障 |
+
+### 通用 axios 拦截器（请求去重）
+
+```ts
+const requestMap = new Map<string, Promise<any>>();
+
+http.interceptors.request.use((config) => {
+  const key = `${config.method}:${config.url}:${JSON.stringify(config.params || {})}`;
+
+  // GET 请求可以安全去重
+  if (config.method === 'get' && requestMap.has(key)) {
+    return Promise.reject({ isDuplicate: true, existingPromise: requestMap.get(key) });
+  }
+
+  const promise = http.request(config);
+  if (config.method === 'get') {
+    requestMap.set(key, promise);
+    promise.finally(() => requestMap.delete(key));
+  }
+  return config;
+});
+```
