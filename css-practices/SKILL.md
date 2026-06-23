@@ -952,6 +952,178 @@ module.exports = {
 
 ---
 
+## CSS 继承 — auto / % / 固定值的场景
+
+### 哪些属性默认继承
+
+```css
+/* ✅ 默认继承的属性（文字相关） */
+color           /* 文字颜色 */
+font-family     /* 字体 */
+font-size       /* 字号（注意：继承的是 computed value，不是百分比） */
+font-weight     /* 字重 */
+line-height     /* 行高 */
+text-align      /* 文字对齐 */
+visibility      /* 可见性 */
+
+/* ❌ 不继承的属性（布局相关） */
+width / height  /* 宽高 */
+margin / padding /* 外边距/内边距 */
+border          /* 边框 */
+background      /* 背景 */
+display         /* 显示模式 */
+position        /* 定位 */
+```
+
+### width / height — auto vs % vs 固定
+
+```css
+/* ─── width ─── */
+
+/* auto（默认）：块级元素自动撑满父级宽度 */
+.block {
+  width: auto;       /* 默认值，等价于不设，= 父级 content 宽度 */
+}
+
+/* 100%：明确等于父级 content 宽度 */
+.full {
+  width: 100%;       /* 和 auto 在普通 flow 下效果一样 */
+}
+
+/* 区别在于：padding + border 时的计算方式不同 */
+.box-auto {
+  width: auto;           /* 容器宽度 - padding - border，自动压缩内容区 */
+  padding: 20px;
+  border: 2px solid;
+  /* 实际：内容区 = 容器宽 - 40px - 4px，总宽正好等于容器 */
+}
+
+.box-100 {
+  width: 100%;           /* 容器宽度，然后 + padding + border，会溢出 */
+  padding: 20px;
+  border: 2px solid;
+  /* 实际：总宽 = 容器宽 + 40px + 4px，超出容器 */
+  /* ✅ 修复：加 box-sizing: border-box */
+}
+
+/* min-width / max-width 兜底 */
+.card {
+  width: auto;           /* 撑满父级 */
+  max-width: 480px;      /* 最宽 480px */
+  min-width: 280px;      /* 最窄 280px */
+}
+
+/* ─── height ─── */
+
+/* auto（默认）：由内容撑开 */
+.no-height {
+  height: auto;       /* 默认值，内容多高就多高 */
+}
+
+/* 100%：父级必须有显式高度才生效 */
+.parent {
+  height: 400px;      /* 父级有固定高度 */
+}
+.child {
+  height: 100%;       /* = 400px，生效 */
+}
+
+/* 否则 height: 100% 不生效 */
+.no-parent-height {
+  height: 100%;       /* ❌ 父级高度 auto → 子级 100% 无效 */
+}
+
+/* 让 height: 100% 生效的三种方式 */
+/* 1. 父级固定高度 */
+.parent { height: 500px; }
+/* 2. 父级 height: 100%（需要一直往上链到 html,body） */
+html, body { height: 100%; }
+.parent { height: 100%; }
+.child { height: 100%; }
+/* 3. 父级用 flex/grid（隐式拉伸） */
+.parent { display: flex; }
+.child { height: 100%; }     /* flex 下 100% 有效 */
+```
+
+### width / height 场景选择
+
+| 场景 | width | height |
+|------|-------|--------|
+| 普通块级元素 | `auto`（默认） | `auto`（内容撑开） |
+| 全宽子元素 | `auto` 或 `100%` | — |
+| 定宽侧边栏 | `280px` | `100vh` |
+| 百分比布局 | `50%` | `100%`（父级需固定） |
+| 响应式卡片 | `auto` + `max-width` + `min-width` | `auto` |
+| 全屏区域 | `100vw` | `100vh` |
+| 正方形 | — | `width` 设值后 `aspect-ratio: 1` |
+
+### font-size — 继承与计算
+
+```css
+/* 默认继承：子元素的 font-size 继承 computed value（计算后的 px） */
+html  { font-size: 16px; }        /* 基准 */
+body  { font-size: 100%; }        /* = 16px（100% 相对父级） */
+h1    { font-size: 2em; }         /* = 32px（2 × 父级 16px） */
+.card { font-size: 0.875rem; }    /* = 14px（相对 html 基准） */
+
+/* ─── em vs rem 的区别 ─── */
+.parent { font-size: 20px; }
+
+.child-em {
+  font-size: 1.5em;               /* = 30px（相对父级 20px） */
+  padding: 1em;                    /* = 30px（相对自身 font-size） */
+  /* ⚠️ em 嵌套会叠加：ul > li > ul → 字号越来小 */
+}
+
+.child-rem {
+  font-size: 1.5rem;              /* = 24px（相对 html 16px） */
+  padding: 1rem;                   /* = 16px（相对 html） */
+  /* ✅ rem 不叠加，始终相对 html */
+}
+
+/* ─── font-size 用 100% 的作用 ─── */
+body { font-size: 100%; }          /* = 浏览器默认（通常是 16px） */
+/* 用户改了浏览器字号时，100% 跟随用户设置 */
+```
+
+| 单位 | 相对谁 | 嵌套叠加 | 推荐场景 |
+|------|--------|---------|---------|
+| `px` | 绝对 | — | 边框、阴影、小尺寸 |
+| `%` | 父级 font-size | ✅ 叠加 | body 基准 `100%` |
+| `em` | 父级 font-size | ✅ 叠加 | 组件内局部相对尺寸（少用） |
+| `rem` | html font-size | ❌ 不叠加 | **字号首选** |
+| `lh` | 行高 | ❌ | 与行高关联的尺寸 |
+
+### line-height 的继承
+
+```css
+body { line-height: 1.6; }           /* ✅ 无单位：相对自身 font-size，子级继承比值 */
+body { line-height: 160%; }          /* ⚠️ 百分比：先算成 px，子级继承固定 px */
+body { line-height: 24px; }          /* ❌ 固定 px：子级字号改变后行高不变 */
+
+/* ✅ 推荐：无单位（比值），继承后仍相对当前字号 */
+body  { line-height: 1.6; }
+.title { font-size: 32px; line-height: 1.6; }  /* = 51.2px，正确 */
+.body  { font-size: 16px; line-height: 1.6; }  /* = 25.6px，正确 */
+```
+
+### 关键区别总结
+
+| 属性 | auto | 100% | 固定值 |
+|------|------|------|--------|
+| width | 填充父级剩余空间 | 等于父级 content 宽 | 固定 px/rem |
+| height | 内容撑开 | 父级必须设固定高度 | 固定 vh/px |
+| font-size | — | 父级 font-size 的 % | px/rem/em |
+
+```
+width: auto   → 自动填充父级（默认行为，推荐大多数场景）
+width: 100%   → 需要配合 box-sizing: border-box 防溢出
+height: auto  → 内容撑开（默认行为，推荐大多数场景）
+height: 100%  → 需要父级有确定高度，否则无效（⚠️ 常见坑）
+```
+
+---
+
 ## Red Flags
 
 - ❌ 多列列表用 `flex-wrap` + `width: calc()` — 换 Grid 一行搞定
