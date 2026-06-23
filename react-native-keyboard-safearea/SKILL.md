@@ -697,14 +697,51 @@ function CustomKeyboardInput() {
 | `react-native-nice-keyboard` | 数字键盘 | 纯数字输入场景 |
 | `react-native-pure-keyboard` | 安全键盘 | 防截屏、防录屏的安全输入 |
 
+### 默认推荐：方案 A (DIY) — 原因
+
+iOS 原生 `secureTextEntry` 安全键盘的**按键圆角无法自定义**，和你的 UI 设计可能不一致。所以默认推荐用 **方案 A (DIY)**：
+
+```tsx
+// ✅ 默认安全键盘 — DIY，圆角/直角完全由你控制，跨平台一致
+function SecurePINInput() {
+  const [pin, setPin] = useState('');
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* 6 位圆点显示 */}
+      <Dots value={pin} length={6} />
+
+      {/* 自定义安全键盘 — 按键样式完全可控 */}
+      <SecureKeyboard
+        value={pin}
+        onChange={setPin}
+        maxLength={6}
+        keyStyle={{ borderRadius: 0 }}   // 直角
+        // keyStyle={{ borderRadius: 12 }} // 自定义圆角
+        shuffle                        // 乱序排列（安全键盘特性）
+      />
+    </View>
+  );
+}
+```
+
+> ⚠️ **iOS 原生 `secureTextEntry` 的限制：**
+> - 按键圆角（corner radius）不可修改
+> - 无法乱序排列
+> - 无法自定义按键颜色/字体
+> - 如果这些对你不是问题，可以直接用 `secureTextEntry` + `TextInput`
+>
+> **Android** 上 `secureTextEntry` 的按键样式可定制（theme 控制），iOS 完全不行。
+
 ### 何时用哪种？
 
 | 场景 | 推荐方案 |
 |------|---------|
-| PIN / 密码输入 | **A** — DIY，无依赖，最可控 |
+| PIN / 密码输入（默认） | **A (DIY)** — iOS 原生安全键盘圆角不可自定义 |
+| 安全键盘 + 乱序排列 | **A (DIY)** — 自定义乱序 + 样式完全可控 |
 | 数字金额输入 (Android) | **B** — `showSoftInputOnFocus`，保留焦点管理 |
-| 数字金额输入 (iOS) | **A** — iOS 不支持 showSoftInputOnFocus |
-| 安全输入（银行类） | **C** — `react-native-pure-keyboard`，自带防截屏 |
+| 数字金额输入 (iOS) | **A** — iOS 不支持 `showSoftInputOnFocus` |
+| 安全输入（银行类） | **A (DIY)** 或 **C** — `pure-keyboard` 自带防截屏 |
 | 复杂自定义布局（计算器、点单） | **A** — DIY，完全自由 |
 
 ## Combined Pattern — SafeArea + Keyboard
