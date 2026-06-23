@@ -134,6 +134,101 @@ a.click();
 URL.revokeObjectURL(url);
 ```
 
+### 异步下载方案
+
+`createObjectURL` + `a.click()` 是同步的，对大文件 UI 线程会卡。以下异步方案按场景选：
+
+#### 方案一：进度跟踪 + 异步下载
+
+```ts
+async function downloadWithProgress(url: string, filename: string) {
+  const res = await http.get(url, {
+    responseType: 'blob',
+    onDownloadProgress: (e) => {
+      const pct = Math.round((e.loaded / e.total!) * 100);
+      console.log(`下载进度: ${pct}%`);
+      // 更新 UI 进度条
+      updateProgress(pct);
+    },
+  });
+
+  // 下载完成后触发浏览器保存（用户点击触发）
+  const blobUrl = URL.createObjectURL(res.data);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(blobUrl);
+}
+```
+
+#### 方案二：File System Access API + 流式写入（不占内存）
+
+```ts
+async function downloadToFile(url: string) {
+  // 弹出「另存为」对话框（用户选择目录）
+  const handle = await (window as any).showSaveFilePicker({
+    suggestedName: 'report.pdf',
+  });
+
+  // 流式下载 + 流式写入，不占内存
+  const response = await fetch(url);
+  const writable = await handle.createWritable();
+  await response.body!.pipeTo(writable);
+  // 下载完成，文件已保存到用户指定位置
+}
+```
+
+> ⚠️ `showSaveFilePicker` 目前 Chrome/Edge 支持，Safari/Firefox 不支持。
+
+#### 方案三：Web Worker 下载（不阻塞 UI）
+
+```ts
+// worker.ts
+self.onmessage = async (e) => {
+  const { url, filename } = e.data;
+  const res = await fetch(url);
+  const blob = await res.blob();
+  self.postMessage({ blob, filename });
+};
+
+// main.ts
+const worker = new Worker(new URL('./worker.ts', import.meta.url));
+worker.postMessage({ url: '/files/report.pdf', filename: 'report.pdf' });
+worker.onmessage = (e) => {
+  const { blob, filename } = e.data;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  worker.terminate();
+};
+```
+
+#### 方案四：直接触发服务器下载（零前端代码）
+
+```tsx
+// 服务端返回 Content-Disposition: attachment
+// 前端直接用 <a> 或 window.open，不经过 JS 下载
+<a href="/api/files/report.pdf" download>下载</a>
+// 或
+window.open('/api/files/report.pdf');
+// ✅ 最简单，大文件不占前端内存
+// ❌ 无法跟踪进度、无法自定义请求头
+```
+
+#### 各方案对比
+
+| 方案 | 内存占用 | 支持进度 | 支持自定义请求头 | 浏览器兼容 |
+|------|---------|---------|----------------|-----------|
+| `createObjectURL` + `a.click` | 高（全量内存） | ❌ | ✅ | ✅ 全平台 |
+| `onDownloadProgress` + blob | 高 | ✅ | ✅ | ✅ 全平台 |
+| `showSaveFilePicker` + stream | **低（流式）** | ❌ | ✅ | ⚠️ Chrome/Edge |
+| Web Worker 下载 | 中 | ❌ | ✅ | ✅ 全平台 |
+| 直接 `<a download>` 触发 | **零（服务器直传）** | ❌ | ❌ | ✅ 全平台 |
+
 | Data type | responseType |
 |-----------|-------------|
 | JSON API | `'json'` (default) |
