@@ -1,6 +1,6 @@
 ---
 name: form-encoding
-description: 表单输入编码 — HTML entity 编码、URL 编码、XSS 防御、DOMPurify 安全输出、encodeURIComponent 与 form 序列化
+description: 表单输入编码与 iframe 安全 — HTML entity 编码、URL 编码、XSS 防御、DOMPurify、encodeURIComponent、form 序列化、iframe postMessage 域名白名单
 ---
 
 # 表单编码与 XSS 防御
@@ -205,6 +205,124 @@ element.innerHTML = DOMPurify.sanitize(userInput);
 | `DOMPurify.sanitize(input)` | 空（script 不在白名单） | ✅ |
 | `JSON.stringify(input)` | `"<script>..."` | ✅ |
 
+---
+
+## iframe postMessage — 域名白名单
+
+跨域 iframe 通信必须校验 `event.origin`，绝对不能相信 `event.source` 或 `event.data` 本身。
+
+### 父页面发送消息给 iframe
+
+```tsx
+const iframeRef = useRef<HTMLIFrameElement>(null);
+
+// ✅ 指定 targetOrigin（白名单域名）
+iframeRef.current?.contentWindow?.postMessage(
+  { type: 'USER_INFO', payload: { id: 1, name: 'John' } },
+  'https://trusted-app.example.com',    // ✅ 只发给这个域名
+);
+
+// ❌ 绝对不能用 '*'
+iframeRef.current?.contentWindow?.postMessage(data, '*'); // 任何 iframe 都能收到
+```
+
+### 父页面接收 iframe 消息
+
+```tsx
+useEffect(() => {
+  const allowedOrigins = [
+    'https://trusted-app.example.com',
+    'https://app-v2.example.com',
+  ];
+
+  const handleMessage = (event: MessageEvent) => {
+    // 1️⃣ 校验域名白名单
+    if (!allowedOrigins.includes(event.origin)) {
+      console.warn('拒绝来自未知域名的消息:', event.origin);
+      return;
+    }
+
+    // 2️⃣ 校验数据类型（避免 prototype pollution）
+    if (typeof event.data !== 'object' || event.data === null) return;
+    if (!event.data.type) return;
+
+    // 3️⃣ 按 type 分发
+    switch (event.data.type) {
+      case 'HEIGHT_CHANGE':
+        setIframeHeight(event.data.payload.height);
+        break;
+      case 'NAVIGATE':
+        router.push(event.data.payload.path);
+        break;
+      default:
+        console.warn('未知消息类型:', event.data.type);
+    }
+  };
+
+  window.addEventListener('message', handleMessage);
+  return () => window.removeEventListener('message', handleMessage);
+}, []);
+```
+
+### iframe 内发送消息给父页面
+
+```tsx
+// iframe 内部
+window.parent?.postMessage(
+  { type: 'HEIGHT_CHANGE', payload: { height: document.body.scrollHeight } },
+  'https://parent-app.example.com',    // ✅ 指定父页面域名
+);
+```
+
+### iframe 内接收父页面消息
+
+```tsx
+useEffect(() => {
+  const parentOrigins = [
+    'https://parent-app.example.com',
+  ];
+
+  const handleMessage = (event: MessageEvent) => {
+    // ❌ 不校验 origin → 任何网页都可以给 iframe 发消息（钓鱼）
+    // ✅ 必须校验 origin
+    if (!parentOrigins.includes(event.origin)) return;
+
+    if (event.data.type === 'THEME_CHANGE') {
+      applyTheme(event.data.payload.theme);
+    }
+  };
+
+  window.addEventListener('message', handleMessage);
+  return () => window.removeEventListener('message', handleMessage);
+}, []);
+```
+
+### 安全 checklist
+
+```js
+// ❌ 常见错误
+window.addEventListener('message', (e) => {
+  if (e.data.type === 'login') {          // 没校验 origin
+    doLogin(e.data.token);                // 任意网站都能伪造
+  }
+});
+
+// ✅ 安全写法
+const ALLOWED = ['https://myapp.com'];
+window.addEventListener('message', (e) => {
+  if (!ALLOWED.includes(e.origin)) return;  // 先校验
+  if (!e.data?.type) return;                // 再验证结构
+  // 然后处理
+});
+```
+
+| 做法 | 风险 |
+|------|------|
+| `postMessage(data, '*')` | 任何窗口都能收到消息 |
+| 不校验 `event.origin` | 任意网站伪造消息 |
+| 不校验 `event.data` 结构 | Prototype pollution / 类型注入 |
+| 只校验 `event.source` | `event.source` 可伪造（钓鱼页面） |
+
 ## Red Flags
 
 - ❌ `{userInput}` 在 JSX 中是安全的，但在 `dangerouslySetInnerHTML` 中不安全
@@ -212,3 +330,7 @@ element.innerHTML = DOMPurify.sanitize(userInput);
 - ❌ 手动拼 URL 参数不 `encodeURIComponent` → 参数注入
 - ❌ 用 `encodeURI` 而不是 `encodeURIComponent` 编码参数值 → 一些字符没转义
 - ❌ 前端编码就够了，后端不需要编码 → 后端也必须编码/校验（双重防御）
+- ❌ `postMessage(data, '*')` → 任何窗口都能收到消息，必须指定具体域名
+- ❌ `message` 事件不校验 `event.origin` → 任意网站可伪造消息，钓鱼/数据泄露
+- ❌ `message` 事件不校验 `event.data` 结构 → prototype pollution / 类型注入
+- ❌ 只校验 `event.source` 不校验 `event.origin` → `event.source` 可以被钓鱼页面利用
