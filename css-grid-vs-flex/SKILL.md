@@ -278,6 +278,55 @@ CSS 版本
 
 ---
 
+## Tailwind 断点 — 768/1024/1280 自带
+
+你说的这三个断点 Tailwind 默认就有，不需要自己定义 CSS 变量。
+
+| Tailwind | 最小宽度 | 说明 |
+|----------|---------|------|
+| `sm` | 640px | 手机横屏 |
+| **`md`** | **768px** | **平板** |
+| **`lg`** | **1024px** | **桌面** |
+| **`xl`** | **1280px** | **宽屏** |
+| `2xl` | 1536px | 超大屏 |
+
+### 用法
+
+```html
+<!-- Tailwind：一行搞定响应式多列 -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+  <!-- md(768) 起 2 列，lg(1024) 起 3 列，xl(1280) 起 4 列 -->
+  <div class="item">卡片</div>
+  <div class="item">卡片</div>
+  ...
+</div>
+```
+
+### 如果你还是想用 CSS 变量定义断点
+
+```css
+/* 不是必须的，Tailwind 自带这些值 */
+:root {
+  --bp-mobile: 768px;
+  --bp-tablet: 1024px;
+  --bp-desktop: 1280px;
+}
+
+/* Tailwind 内部就是这样定义的（在 tailwind.config.js 里改） */
+module.exports = {
+  theme: {
+    screens: {
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+    }
+  }
+}
+```
+
+> **Tailwind 直接用 responsive prefix 就行，不用自己写 CSS var。**
+> 只有在不用 Tailwind 的纯 CSS 项目里才需要手动定义断点变量。
+
 ## Red Flags
 
 - ❌ 多列列表用 `flex-wrap` + `width: calc()` — 换 Grid 一行搞定
