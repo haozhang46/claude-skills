@@ -67,7 +67,10 @@ npx why-is-node-running
 ```
 
 **内存泄漏常见原因：**
-- 全局变量 / 闭包未释放
+- 事件监听器只加不移除（`addEventListener` 无 cleanup）
+- 定时器未清除（`setInterval` 没有 `clearInterval`）
+- 全局缓存无淘汰策略（用 `lru-cache` 替代普通 Map）
+- 大对象被长期存活的闭包引用（闭包本身不释放，引用的对象就无法 GC）
 - 事件监听器未移除（`emitter.on()` 没有 `off()`）
 - 定时器未清除（`setInterval` 没有 `clearInterval`）
 - 大对象缓存无淘汰策略（用 `lru-cache` 替代普通 Map）
@@ -404,7 +407,7 @@ TypeOrmModule.forRoot({
 ## Red Flags
 
 - ❌ 生产环境不带 `--max-old-space-size` → OOM 时 GC 暂停长达秒级
-- ❌ 闭包持有大对象 → 内存泄漏，用 heapdump 定位
+- ❌ 事件监听器只加不移除 → 回调函数持有大对象引用，组件卸载后仍然存活
 - ❌ 事件监听器只加不移除 → 内存泄漏 + 重复执行
 - ❌ Next.js 全量 `'use client'` → JS bundle 膨胀，默认用 Server Components
 - ❌ 图片不加 `priority` 和 `quality` → LCP 变差，体积变大
