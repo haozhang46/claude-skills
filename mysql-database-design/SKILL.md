@@ -165,6 +165,171 @@ EXPLAIN SELECT * FROM users WHERE email = 'a@x.com';
 - 避免 `Using filesort`（加排序索引）
 - 避免 `Using temporary`（优化 GROUP BY / DISTINCT）
 
+### JOIN 与 N+1 查询优化
+
+#### JOIN 性能关键
+
+```sql
+-- ❌ 全表扫描 JOIN（没有索引，驱动表全表扫 + 被驱动表全表扫）
+SELECT * FROM users u
+LEFT JOIN orders o ON u.id = o.user_id   -- o.user_id 无索引
+WHERE u.status = 1;
+-- type: ALL / ALL, rows: 全表 + 全表
+
+-- ✅ 被驱动表连接列建索引（Nested Loop Join 效率提升百倍）
+CREATE INDEX idx_user_id ON orders(user_id);
+-- type: ALL / ref, rows: 全表 + 少量
+
+-- ✅ 驱动表用小表（MySQL 自动选，但建索引最关键）
+-- 驱动表 → 全表扫一次
+-- 被驱动表 → 每次通过索引查找，O(log n)
+```
+
+**MySQL JOIN 执行过程（Nested Loop Join）：**
+
+```
+for each row in 驱动表:              -- 扫描驱动表 N 行
+    for each row in 被驱动表:          -- 通过索引查找被驱动表
+        if 匹配 → 返回
+```
+
+**优化目标：**
+- **被驱动表的连接列必须建索引**（`o.user_id`、`o.product_id`）
+- 驱动表用小表（MySQL 优化器自动选，必要时用 `STRAIGHT_JOIN` 强制）
+- 只 SELECT 需要的列，不要 `SELECT *`
+- 大表 JOIN 用分页 + 子查询先缩小范围
+
+```sql
+-- ✅ JOIN 前先缩小数据范围
+SELECT * FROM (
+  SELECT * FROM users WHERE status = 1 LIMIT 100
+) u
+LEFT JOIN orders o ON u.id = o.user_id;
+
+-- ✅ 只取需要的字段，减少回表
+SELECT u.id, u.name, o.order_no, o.amount
+FROM users u
+LEFT JOIN orders o ON u.id = o.user_id
+WHERE u.status = 1;
+```
+
+#### N+1 查询问题
+
+N+1 不是 SQL 层面问题，而是 **ORM（MyBatis / JPA / Hibernate）代码层面**的问题：
+
+```
+查询 1:  SELECT * FROM users WHERE status = 1               -- 1 条
+查询 2:  SELECT * FROM orders WHERE user_id = 1              -- N 条
+查询 3:  SELECT * FROM orders WHERE user_id = 2
+...
+查询 N+1: SELECT * FROM orders WHERE user_id = N
+```
+
+N = 100 用户 → 101 条 SQL，网络往返和数据库解析开销巨大。
+
+##### MyBatis 中的 N+1（`<association>` / `<collection>` 懒加载）
+
+```xml
+<!-- ❌ N+1：查询用户时，每个用户单独加载 orders -->
+<resultMap id="UserWithOrdersLazy" type="User">
+  <id column="id" property="id" />
+  <result column="name" property="name" />
+  <collection property="orders" column="id"
+              select="com.example.mapper.OrderMapper.getByUserId"
+              fetchType="lazy" />       <!-- 懒加载 → N+1 -->
+</resultMap>
+
+<select id="getUsers" resultMap="UserWithOrdersLazy">
+  SELECT * FROM users WHERE status = 1     -- 1 条
+</select>
+<!-- 遍历 100 个用户时 → 额外 100 条 SELECT orders -->
+
+-- ✅ 解决：JOIN 一次查完
+<resultMap id="UserWithOrdersJoin" type="User">
+  <id column="id" property="id" />
+  <result column="name" property="name" />
+  <collection property="orders" ofType="Order">
+    <id column="order_id" property="id" />
+    <result column="order_no" property="orderNo" />
+  </collection>
+</resultMap>
+
+<select id="getUsersWithOrders" resultMap="UserWithOrdersJoin">
+  SELECT u.*, o.id AS order_id, o.order_no
+  FROM users u
+  LEFT JOIN orders o ON u.id = o.user_id
+  WHERE u.status = 1                              -- 1 条 SQL 搞定
+</select>
+```
+
+##### MyBatis 批量查询替代 N+1
+
+```xml
+<!-- ✅ 先查用户列表，再批量查订单，最后内存中组装 -->
+<select id="getUsers" resultType="User">
+  SELECT * FROM users WHERE status = 1      -- 1 条
+</select>
+
+<select id="getOrdersByUserIds" resultType="Order">
+  SELECT * FROM orders WHERE user_id IN
+  <foreach collection="userIds" item="id" open="(" separator="," close=")">
+    #{id}
+  </foreach>                                 -- 1 条
+</select>
+```
+
+```java
+// Java 内存组装
+List<User> users = userMapper.getUsers();
+List<Long> userIds = users.stream().map(User::getId).toList();
+List<Order> orders = orderMapper.getOrdersByUserIds(userIds);
+Map<Long, List<Order>> orderMap = orders.stream()
+    .collect(Collectors.groupingBy(Order::getUserId));
+
+users.forEach(u -> u.setOrders(orderMap.getOrDefault(u.getId(), List.of())));
+```
+
+**2 条 SQL（原方案）= N+1 条 SQL（现方案）。**
+
+##### JPA / Hibernate 的 N+1
+
+```java
+// ❌ N+1：每个 Category 单独查 Products
+List<Category> categories = categoryRepository.findAll();
+for (Category c : categories) {
+    System.out.println(c.getProducts().size()); // 触发 N 次查询
+}
+
+// ✅ @EntityGraph 优化
+@Query("SELECT c FROM Category c LEFT JOIN FETCH c.products")
+List<Category> findAllWithProducts();
+```
+
+#### N+1 检测方法
+
+```sql
+-- 开启慢查询日志，观察是否有大量结构相同的 SQL
+-- N+1 的特征：N 条 SQL 只有参数不同，结构完全一样
+SELECT * FROM orders WHERE user_id = 1
+SELECT * FROM orders WHERE user_id = 2
+SELECT * FROM orders WHERE user_id = 3
+...
+
+-- 或者开启 general_log
+SET GLOBAL general_log = ON;
+SET GLOBAL log_output = 'TABLE';
+SELECT * FROM mysql.general_log ORDER BY event_time DESC LIMIT 50;
+```
+
+#### 各场景方案
+
+| 场景 | ❌ 错误做法 | ✅ 正确做法 |
+|------|-----------|-----------|
+| 主表 + 从属表（用户+订单） | `<collection>` 懒加载 | JOIN 一次查或批量 IN 查询 |
+| 主表 + 单条关联（用户+头像） | N 次 `findById` | JOIN 或 `IN (...)` |
+| 分页列表 + 关联数据 | 循环查关联表 | 先查主表，再批量查关联 |
+| 树形结构（分类+子分类） | 递归 N+1 | CTE 递归（MySQL 8.0+）或一次性查完内存组装 |
+
 ### 慢查询分析
 
 ```sql
