@@ -146,27 +146,41 @@ router.get('/api/users', (req, res) => {
   res.json(result);
 });
 
-// 5. 事件监听器未移除（这才是真正的内存泄漏）
+// 5. 事件监听器只加不移除（Node.js 中同样泄漏）
 // ❌ 每次调用都加监听，从不移除
-function MountButton() {
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll); // 组件卸载后还在
-  }, []);
+function handleRequest(req, res) {
+  process.on('uncaughtException', handleError); // 每次请求都加，永远不删
+}
+// ✅ 在合适的生命周期移除
+process.on('uncaughtException', handleError);
+process.removeListener('uncaughtException', handleError);
+
+// 流未销毁
+// ❌ 可读流不关闭
+function readFile(path) {
+  const stream = fs.createReadStream(path);
+  stream.on('data', console.log);
+  // stream 用完后没 close/destroy
 }
 
-// ✅ 组件卸载时移除
-function MountButton() {
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+// ✅ 流用完后销毁
+async function readFile(path) {
+  const stream = fs.createReadStream(path);
+  for await (const chunk of stream) {
+    console.log(chunk);
+  }
+  stream.destroy(); // 显式销毁
 }
 
 // 6. 定时器未清除
-useEffect(() => {
-  const timer = setInterval(() => fetchData(), 5000);
-  return () => clearInterval(timer); // ✅ 必须清除
-}, []);
+// ❌ 定时器无限运行
+function startPolling() {
+  setInterval(() => fetchData(), 5000);
+}
+// ✅ 保存引用，适时清除
+let timer = setInterval(() => fetchData(), 5000);
+// 不再需要时
+clearInterval(timer);
 ```
 
 #### Node.js 性能 Checklist
