@@ -411,7 +411,164 @@ const search = useCallback(debounce((t) => searchAPI(t), 300), []);
 
 > **Native side (iOS/Android):** There is no native `isComplete` callback for "user stopped typing." The standard UIKit/Android approach is `textField(_:shouldChangeCharactersIn:)` / `onTextChanged` with a timer — which is exactly what the JS debounce pattern replicates. `onSubmitEditing` maps directly to `textFieldShouldReturn` (iOS) / `onEditorAction(IME_ACTION_DONE)` (Android).
 
-### Platform-Specific Tips
+---
+
+## Keyboard Controller — react-native-keyboard-controller
+
+Replace built-in `KeyboardAvoidingView` + `Keyboard` listener boilerplate with [`react-native-keyboard-controller`](https://kirillzyusko.github.io/react-native-keyboard-controller/) — consistent on both platforms, animated, interactive.
+
+### Setup
+
+```tsx
+// App.tsx — 替换 SafeAreaProvider 或包在外面
+import { KeyboardProvider } from 'react-native-keyboard-controller';
+
+export default function App() {
+  return (
+    <KeyboardProvider>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </KeyboardProvider>
+  );
+}
+```
+
+### useReanimatedKeyboardAnimation — 替代 Manual Keyboard Listener
+
+```tsx
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+
+function ChatInput() {
+  const { height, progress } = useReanimatedKeyboardAnimation();
+  const insets = useSafeAreaInsets();
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -height.value }],
+  }));
+
+  return (
+    <View style={{ flex: 1 }}>
+      <MessageList />
+      <Animated.View style={[{ paddingBottom: insets.bottom }, animatedStyle]}>
+        <TextInput placeholder="Type a message..." />
+      </Animated.View>
+    </View>
+  );
+}
+```
+
+`height` = 键盘实际高度，`progress` = 0→1 动画进度，都是 Reanimated shared value，60fps 不丢帧。
+
+### KeyboardAwareScrollView — 替代 KeyboardAwareScrollView (第三方)
+
+自带键盘感知滚动，不需要另外装 `react-native-keyboard-aware-scroll-view`。
+
+```tsx
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+
+function LongForm() {
+  return (
+    <KeyboardAwareScrollView keyboardShouldPersistTaps="handled">
+      <TextInput placeholder="Name" />
+      <TextInput placeholder="Email" />
+      <Button title="Submit" />
+    </KeyboardAwareScrollView>
+  );
+}
+```
+
+### KeyboardAvoidingView — 替代内置 KeyboardAvoidingView
+
+```tsx
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+
+// 不需要 behavior / keyboardVerticalOffset，自动处理
+<KeyboardAvoidingView style={{ flex: 1 }}>
+  <ScrollView keyboardShouldPersistTaps="handled">
+    <TextInput />
+  </ScrollView>
+</KeyboardAvoidingView>
+```
+
+### KeyboardStickyView — 吸附键盘顶部
+
+适合聊天输入框、底部工具条：
+
+```tsx
+import { KeyboardStickyView } from 'react-native-keyboard-controller';
+
+<KeyboardStickyView>
+  <View style={{ flexDirection: 'row', padding: 8 }}>
+    <TextInput placeholder="Type a message..." style={{ flex: 1 }} />
+    <Button title="Send" />
+  </View>
+</KeyboardStickyView>
+```
+
+自动吸附在键盘上方，键盘弹出时上移、收起时下移，动画平滑。
+
+### KeyboardToolbar — 表单导航工具栏
+
+为表单自动添加 Prev / Next / Done 工具栏（类似 Safari 表单栏）：
+
+```tsx
+import { KeyboardToolbar } from 'react-native-keyboard-controller';
+
+<View>
+  <TextInput placeholder="Email" />
+  <TextInput placeholder="Password" />
+  <KeyboardToolbar />
+</View>
+```
+
+### KeyboardEvents — 替代 Keyboard.addListener
+
+```tsx
+import { KeyboardEvents } from 'react-native-keyboard-controller';
+
+useEffect(() => {
+  const sub1 = KeyboardEvents.addListener('keyboardWillShow', (e) => {
+    console.log('height:', e.height, 'duration:', e.duration);
+  });
+  const sub2 = KeyboardEvents.addListener('keyboardWillHide', (e) => {
+    console.log('will hide');
+  });
+  return () => {
+    sub1.remove();
+    sub2.remove();
+  };
+}, []);
+```
+
+`keyboardWillShow` / `keyboardWillHide` 在 iOS 和 Android 上都生效（内置 `Keyboard` 的 will 事件仅 iOS 有）。
+
+### Imperative API — KeyboardController
+
+```tsx
+import { KeyboardController } from 'react-native-keyboard-controller';
+
+// 主动控制键盘
+KeyboardController.dismiss();
+KeyboardController.setMode('resize');    // 切换软输入模式（Android）
+KeyboardController.setMode('pan');
+KeyboardController.setMode('nothing');
+```
+
+### Summary — 替换对照表
+
+| 旧方案（内置/第三方） | 替代 |
+|----------------------|------|
+| `KeyboardAvoidingView` (RN) | `KeyboardAvoidingView` (keyboard-controller) |
+| `KeyboardAwareScrollView` (第三方) | `KeyboardAwareScrollView` (keyboard-controller) |
+| `Keyboard.addListener('keyboardWillShow')` | `KeyboardEvents.addListener('keyboardWillShow')` |
+| `useState` + `setTimeout` 手动跟键盘高度 | `useReanimatedKeyboardAnimation()` |
+| Chat 输入框手动动画 | `KeyboardStickyView` |
+| 表单 Prev/Next/Done 工具栏 | `KeyboardToolbar` |
+| `Keyboard.dismiss()` | `KeyboardController.dismiss()` |
 
 ### Platform-Specific Tips
 
@@ -419,11 +576,39 @@ const search = useCallback(debounce((t) => searchAPI(t), 300), []);
 
 ## Combined Pattern — SafeArea + Keyboard
 
-The most robust pattern for screens with both SafeArea and keyboard:
+### 推荐方案：react-native-keyboard-controller
 
 ```tsx
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+
+function FormScreen() {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={{ flex: 1, paddingBottom: insets.bottom }}>
+      <KeyboardAwareScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          paddingTop: insets.top,
+          paddingHorizontal: 16,
+        }}
+      >
+        <HeaderSection />
+        <FormField label="Name" />
+        <FormField label="Email" />
+        <Button title="Submit" />
+      </KeyboardAwareScrollView>
+    </View>
+  );
+}
+```
+
+### 备选方案：内置 API（无需额外安装）
+
+```tsx
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 function FormScreen() {
@@ -457,7 +642,7 @@ function FormScreen() {
 }
 ```
 
-**Layering logic:**
+**Layering logic (备选方案):**
 1. Outer `View` handles `insets.bottom` (SafeArea bottom padding is always respected)
 2. `KeyboardAvoidingView` handles the keyboard push (iOS only)
 3. `KeyboardAwareScrollView` handles auto-scroll to the focused input
@@ -470,11 +655,12 @@ function FormScreen() {
 - ❌ Using `SafeAreaView` from `react-native` core (deprecated, no edge control)
 - ❌ Missing `SafeAreaProvider` wrapper → `useSafeAreaInsets()` returns `{ top: 0, bottom: 0, ... }`
 - ❌ Forgetting `keyboardVerticalOffset` on iOS → content pushed too high by nav bar height
-- ❌ Using `keyboardWillShow` on Android → event never fires, use `keyboardDidShow`
-- ❌ `KeyboardAvoidingView` without `behavior` prop → no effect
+- ❌ Using `keyboardWillShow` on Android → event never fires, use `keyboardDidShow`（或用 `keyboard-controller` 的 `KeyboardEvents`，双平台都支持 will 事件）
+- ❌ `KeyboardAvoidingView` without `behavior` prop → no effect（或用 `keyboard-controller` 的版本，不需要 behavior）
 - ❌ Ignoring gesture navigation bottom inset on Android (`insets.bottom > 0` on gesture nav devices)
 - ❌ Waiting for a native `isComplete` callback — RN TextInput has no such prop, use JS debounce
 - ❌ `onSubmitEditing` without `returnKeyType` — keyboard button shows default "return" instead of "Search"/"Done"/"Send"
 - ❌ Missing `Keyboard.dismiss()` in `onSubmitEditing` — keyboard stays open after submit on some platforms
 - ❌ CJK 输入法选字 Enter 误触 `onSubmitEditing` — 用 `nativeEvent.isComposing` 过滤，不需要手动维护 ref + `onCompositionStart/End`
 - ❌ `multiline` 下用了 `onSubmitEditing` / `returnKeyType` — 这两个 prop 对 multiline TextInput 不生效，改用 `onKeyPress` 拦截 Enter
+- ❌ 混用 `KeyboardAvoidingView` (RN) + `keyboard-controller` 在同一页 — 只用其中一个即可
