@@ -79,3 +79,70 @@ See CLAUDE.md for Claude Code specifics.
 - AGENTS.md duplicating CLAUDE.md → have AGENTS.md reference it
 - Deploy secrets in CLAUDE.md → use `.env` files
 - Every convention in one file → split to skills
+
+---
+
+## env 初始化 — `.env.example` + 初始化脚本
+
+`.env` 不上传 Git，用 `.env.example` + 脚本在项目初始化时生成。
+
+### 文件结构
+
+```
+project/
+├── .env.example          # ✅ committed — 模板，含占位值
+├── .env                  # ❌ gitignored — 开发环境真实值
+├── .env.local            # ❌ gitignored — 本地覆盖
+├── .env.production       # ❌ gitignored — 生产环境
+├── scripts/setup-env.sh  # ✅ 开发环境初始化脚本
+└── .gitignore
+```
+
+### `.gitignore`
+
+```
+.env
+.env.local
+.env.production
+.env.*.local
+```
+
+### `.env.example`（提交到 Git）
+
+```
+# 复制此文件为 .env 后填入真实值
+VITE_API_BASE_URL=https://api.example.com
+VITE_APP_TITLE=MyApp
+# VITE_SECRET_KEY=  # 敏感值只写 key，不写值
+```
+
+### `scripts/setup-env.sh`
+
+```bash
+#!/bin/bash
+set -e
+
+if [ ! -f .env ]; then
+  cp .env.example .env
+  echo "✅ 已创建 .env，请填入真实值后运行项目"
+else
+  echo "⏭️  .env 已存在，跳过"
+fi
+```
+
+### CI/生产环境通过 API 拉取
+
+```yaml
+# CI 中：从 Secret Manager 拉取敏感值
+- name: Setup env
+  run: |
+    scripts/setup-env.sh
+    curl -s -H "Authorization: Bearer $CI_TOKEN" \
+      https://config.internal/api/env/production \
+      | jq -r 'to_entries | map("\(.key)=\(.value)") | .[]' > .env
+```
+
+**初始化流程：**
+1. 新开发者 `git clone` → 运行 `scripts/setup-env.sh` → 复制 `.env.example` 为 `.env`
+2. 填入真实值（API key、DB URL 等）
+3. CI/生产 → 从 Secret Manager API 拉取，不手填
