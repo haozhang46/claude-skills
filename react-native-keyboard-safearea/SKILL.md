@@ -203,41 +203,7 @@ No native `isComplete` prop. Three complementary patterns for different "when ha
 
 #### Pattern A: `isTyping` — 输入中状态
 
-Track whether the user is actively typing. `isTyping = true` starts on first keystroke; after a pause (debounce) it flips back to `false`.
-
-```tsx
-import { useDebounce } from 'ahooks';
-
-function ChatInput() {
-  const [text, setText] = useState('');
-
-  // 用户正在输入 → true, 停笔 500ms → false
-  const isTyping = useDebounce(text, { wait: 500 }) !== text
-                    || (text.length > 0 && text === useDebounce(text, { wait: 500 }));
-
-  // 更直观的写法：独立 isTyping state
-  const [isTyping, setIsTyping] = useState(false);
-
-  useEffect(() => {
-    if (text.length > 0) {
-      setIsTyping(true);
-      const timer = setTimeout(() => setIsTyping(false), 500);
-      return () => clearTimeout(timer);
-    } else {
-      setIsTyping(false);
-    }
-  }, [text]);
-
-  return (
-    <View>
-      <TextInput value={text} onChangeText={setText} />
-      {isTyping && <Text>对方正在输入...</Text>}
-    </View>
-  );
-}
-```
-
-For a reusable hook:
+标准 JS API：`onChangeText` 时 `setIsTyping(true)` + `setTimeout` 延时复位。
 
 ```tsx
 function useIsTyping(text: string, delay = 500): boolean {
@@ -248,8 +214,10 @@ function useIsTyping(text: string, delay = 500): boolean {
       setIsTyping(false);
       return;
     }
-    setIsTyping(true);
-    const timer = setTimeout(() => setIsTyping(false), delay);
+    setIsTyping(true);                              // 每次按键 → true
+    const timer = setTimeout(() => {
+      setIsTyping(false);                           // 停笔 delay ms → false
+    }, delay);
     return () => clearTimeout(timer);
   }, [text, delay]);
 
@@ -257,10 +225,47 @@ function useIsTyping(text: string, delay = 500): boolean {
 }
 ```
 
-| Use | `isTyping = true` | `isTyping = false` |
-|-----|-------------------|---------------------|
-| Chat "对方正在输入..." | User starts typing | 500ms after last keystroke |
-| Send button state | Text exists (combined with `text.length > 0`) | Text cleared |
+对于中文/日文/韩文输入法（IME），用 `onCompositionStart` / `onCompositionEnd` 避免拼字中途误判：
+
+```tsx
+function ChatInput() {
+  const [text, setText] = useState('');
+  const [isComposing, setIsComposing] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const clearTyping = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setIsTyping(false), 500);
+  };
+
+  return (
+    <TextInput
+      value={text}
+      onChangeText={(t) => {
+        setText(t);
+        if (!isComposing) {
+          setIsTyping(true);
+          clearTyping();
+        }
+      }}
+      onCompositionStart={() => setIsComposing(true)}
+      onCompositionEnd={(e) => {
+        setIsComposing(false);
+        setIsTyping(true);
+        clearTyping();
+      }}
+    />
+  );
+}
+```
+
+| 场景 | `isTyping` 机制 |
+|------|----------------|
+| 英文/数字输入 | `onChangeText` → `setIsTyping(true)` + `setTimeout(..., 500)` |
+| 中文拼音/日文假名输入 | `onCompositionStart` 时不触发，`onCompositionEnd` 才算一次 |
+| 清空输入框 | `text.length === 0` → 立即 `setIsTyping(false)` |
+| Chat "对方正在输入..." | 配合 WebSocket 在 `isTyping` 变化时发送 typing indicator |
 
 #### Pattern B: `onSubmitEditing` — Enter / Done Key Press
 
