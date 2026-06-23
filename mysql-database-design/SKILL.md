@@ -350,6 +350,142 @@ UPDATE inventory SET stock = stock - 1 WHERE product_id = 1;
 COMMIT;  -- 释放锁
 ```
 
+### 锁的兜底机制
+
+InnoDB 的锁不是万能的，以下机制作为兜底防线：
+
+#### 1. 无索引 → 行锁升级为表锁
+
+```sql
+-- ❌ 没索引的行锁：X 锁附加在聚簇索引上，但如果 WHERE 条件无索引
+-- InnoDB 无法确定哪些行需要锁定 → 锁定全表（实际是每行都加锁）
+SELECT * FROM users WHERE email = 'a@x.com' FOR UPDATE;
+-- email 无索引 → 锁所有行（等价于表锁），并发性能骤降
+
+-- ✅ 保证 WHERE 条件有索引，行锁才能生效
+CREATE INDEX idx_email ON users(email);
+```
+
+**关键：** InnoDB 行锁是通过在**索引项**上加锁实现的。没有索引时，MySQL 会扫描全表，在每一行上加上锁，再根据 WHERE 条件释放不匹配的行。虽然最终只锁了目标行，但扫描过程中锁了大量行，同样表现如表锁。
+
+#### 2. `innodb_lock_wait_timeout` — 锁等待超时
+
+```sql
+-- 一个事务等待锁超过此时间 → 自动放弃并返回错误
+-- 默认 50 秒，可根据业务调整
+
+-- 查看当前设置
+SHOW VARIABLES LIKE 'innodb_lock_wait_timeout';
+
+-- 会话级修改（推荐低频等待场景改小）
+SET SESSION innodb_lock_wait_timeout = 5;  -- 5 秒超时
+
+-- 全局修改
+SET GLOBAL innodb_lock_wait_timeout = 10;
+
+-- 超时后会返回
+-- ERROR 1205 (HY000): Lock wait timeout exceeded; try restarting transaction
+```
+
+> 设为较短时间（如 3~5s）可以让锁问题快速失败，避免请求堆积。但不能过短，否则正常事务可能被误杀。
+
+#### 3. 死锁检测与自动回滚
+
+InnoDB 内部有死锁检测机制（waits-for graph），检测到死锁后自动回滚**代价较小的事务**（影响行数少的）。
+
+```sql
+-- 死锁发生时，被回滚的事务收到
+-- ERROR 1213 (40001): Deadlock found when trying to get lock; try restarting transaction
+
+-- 查看最近一次死锁详细信息
+SHOW ENGINE INNODB STATUS\G;
+-- 输出中包含 LATEST DETECTED DEADLOCK 章节
+-- 显示：哪两个事务、各自持有的锁、等待的锁、被回滚的是谁
+```
+
+**应用层兜底：** 捕获 `1213` 错误，重试事务。
+
+```python
+import pymysql
+import time
+
+def execute_with_retry(sql, params, max_retries=3):
+    for i in range(max_retries):
+        try:
+            cursor.execute(sql, params)
+            connection.commit()
+            return
+        except pymysql.err.OperationalError as e:
+            if e.args[0] == 1213:            # Deadlock
+                if i < max_retries - 1:
+                    time.sleep(0.1 * (i + 1))  # 递增等待
+                    continue
+                raise
+            raise
+```
+
+#### 4. `NOWAIT` / `SKIP LOCKED` — 不等待直接跳过（MySQL 8.0+）
+
+```sql
+-- NOWAIT：拿不到锁立刻报错，不等待
+SELECT * FROM inventory WHERE product_id = 1 FOR UPDATE NOWAIT;
+-- 锁被占用时立刻返回
+-- ERROR 3572 (HY000): Statement aborted because lock(s) could not be acquired immediately
+
+-- SKIP LOCKED：跳过已经被锁的行，只返回未锁的行
+SELECT * FROM inventory WHERE status = 'available' FOR UPDATE SKIP LOCKED;
+-- 适合任务队列场景：多个 worker 抢任务，各自拿到不同行
+```
+
+**业务场景对比：**
+
+| 语法 | 行为 | 适用场景 |
+|------|------|---------|
+| `FOR UPDATE` （默认） | 等待直到超时 | 常规行锁 |
+| `FOR UPDATE NOWAIT` | 拿不到立刻报错 | 高并发秒杀、库存扣减 |
+| `FOR UPDATE SKIP LOCKED` | 跳过已锁的行 | 任务队列、消息拉取 |
+
+#### 5. 兜底监控与排查
+
+```sql
+-- 查看当前所有锁等待
+SELECT * FROM performance_schema.data_lock_waits;
+
+-- 查看阻塞链（哪个事务被哪个事务阻塞）
+SELECT
+  waiting.trx_id AS waiting_trx,
+  blocking.trx_id AS blocking_trx,
+  waiting.requested_lock_id,
+  waiting.blocking_lock_id
+FROM performance_schema.data_lock_waits;
+
+-- 快速找到锁等待超时的源头
+SELECT
+  THREAD_ID,
+  PROCESSLIST_ID,
+  PROCESSLIST_USER,
+  PROCESSLIST_HOST,
+  PROCESSLIST_DB,
+  PROCESSLIST_COMMAND,
+  PROCESSLIST_TIME,
+  PROCESSLIST_INFO
+FROM performance_schema.threads
+WHERE PROCESSLIST_COMMAND = 'Query'
+ORDER BY PROCESSLIST_TIME DESC;
+
+-- 监控锁等待情况（定期采集）
+SELECT
+  trx_id,
+  trx_state,
+  trx_started,
+  trx_requested_lock_id,
+  trx_wait_started,
+  trx_mysql_thread_id,
+  trx_query
+FROM information_schema.INNODB_TRX
+WHERE trx_state = 'LOCK WAIT';
+```
+
 ### 死锁排查
 
 ```sql
