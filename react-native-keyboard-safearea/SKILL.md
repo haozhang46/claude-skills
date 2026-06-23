@@ -270,17 +270,13 @@ function ChatInput() {
 #### Pattern B: `onSubmitEditing` — Enter / Done Key
 
 当用户点击键盘的 **Enter / Search / Done / Send** 按钮时触发。
-⚠️ **CJK 输入法（中文拼音/五笔、日文假名）选字按 Enter 也会触发 `onSubmitEditing`**，需要配合 composition 事件过滤。
+⚠️ **CJK 输入法（中文拼音/五笔、日文假名）选字按 Enter 也会触发 `onSubmitEditing`**，用 `nativeEvent.isComposing` 过滤。
 
 ```tsx
 function SearchField() {
   const [query, setQuery] = useState('');
-  const isComposingRef = useRef(false);
 
   const handleSubmit = useCallback(() => {
-    // ❌ 输入法选字时 Enter → 跳过，不是真正的提交
-    if (isComposingRef.current) return;
-
     if (!query.trim()) return;
     searchAPI(query.trim());
     Keyboard.dismiss();
@@ -290,20 +286,16 @@ function SearchField() {
     <TextInput
       value={query}
       onChangeText={setQuery}
-      onSubmitEditing={handleSubmit}
+      onSubmitEditing={(e) => {
+        // nativeEvent.isComposing 原生支持，RN + 浏览器通用
+        if ((e.nativeEvent as any).isComposing) return;
+        handleSubmit();
+      }}
       returnKeyType="search"
-      onCompositionStart={() => { isComposingRef.current = true; }}
-      onCompositionEnd={() => { isComposingRef.current = false; }}
     />
   );
 }
 ```
-
-**为什么用 ref 不用 state？** `onSubmitEditing` 和 `onCompositionEnd` 的时序是：
-```
-onCompositionEnd → onSubmitEditing (几乎同时)
-```
-如果用 `setIsComposing(false)`，`onSubmitEditing` 读到的是**上一次的 state 值**（还是 true）。ref 确保实时读到最新值。
 
 | `returnKeyType` | 键盘按钮 | 典型场景 |
 |-----------------|---------|----------|
@@ -320,7 +312,6 @@ onCompositionEnd → onSubmitEditing (几乎同时)
 function LoginForm() {
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
-  const isComposingRef = useRef(false);
 
   return (
     <View>
@@ -328,38 +319,36 @@ function LoginForm() {
         ref={emailRef}
         placeholder="Email"
         returnKeyType="next"
-        onSubmitEditing={() => {
-          if (isComposingRef.current) return;
+        onSubmitEditing={(e) => {
+          if ((e.nativeEvent as any).isComposing) return;
           passwordRef.current?.focus();
         }}
-        onCompositionStart={() => { isComposingRef.current = true; }}
-        onCompositionEnd={() => { isComposingRef.current = false; }}
       />
       <TextInput
         ref={passwordRef}
         placeholder="Password"
         returnKeyType="done"
         secureTextEntry
-        onSubmitEditing={() => {
-          if (isComposingRef.current) return;
+        onSubmitEditing={(e) => {
+          if ((e.nativeEvent as any).isComposing) return;
           handleLogin();
         }}
-        onCompositionStart={() => { isComposingRef.current = true; }}
-        onCompositionEnd={() => { isComposingRef.current = false; }}
       />
     </View>
   );
 }
 ```
 
+> **底层原理：** `isComposing` 是 DOM 标准属性（`KeyboardEvent.isComposing`），React Native 也透传了它。
+> 不需要手动维护 `onCompositionStart/End` + ref，`nativeEvent.isComposing` 在 RN 和浏览器上都可用。
+
 #### Pattern B2: Chat 发送 — Enter 防输入法误触
 
-聊天输入框既要支持多行（Enter 换行），又要支持 Enter 发送，还要防选中文字时误发：
+聊天输入框既要支持多行（Enter 换行），又要支持 Enter 发送，还要防选字时误发：
 
 ```tsx
 function ChatInput() {
   const [text, setText] = useState('');
-  const isComposingRef = useRef(false);
 
   const sendMessage = () => {
     if (!text.trim()) return;
@@ -368,31 +357,25 @@ function ChatInput() {
     Keyboard.dismiss();
   };
 
-  const handleKeyPress = ({ nativeEvent }: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
-    // Enter（非输入法选字）→ 发送
-    // Shift+Enter → 换行（由 multiline 自然处理）
-    if (nativeEvent.key === 'Enter' && !isComposingRef.current) {
-      sendMessage();
-    }
-  };
-
   return (
     <TextInput
       value={text}
       onChangeText={setText}
       multiline
-      blurOnSubmit={false}          // ⚠️ 不让 Enter 自动失焦
-      onKeyPress={handleKeyPress}
-      onCompositionStart={() => { isComposingRef.current = true; }}
-      onCompositionEnd={() => { isComposingRef.current = false; }}
+      blurOnSubmit={false}
+      onKeyPress={({ nativeEvent }) => {
+        // Enter（非输入法选字）→ 发送
+        // Shift+Enter → 换行（multiline 自然处理）
+        if (nativeEvent.key === 'Enter' && !(nativeEvent as any).isComposing) {
+          sendMessage();
+        }
+      }}
     />
   );
 }
 ```
 
-> ⚠️ `multiline` 为 true 时 `returnKeyType` / `onSubmitEditing` 均不生效（RN 行为），Enter 由 `onKeyPress` 接管。
-
-#### Pattern C: Debounce — Stopped Typing (Auto-Save / Search)
+> ⚠️ `multiline` 为 true 时 `returnKeyType` / `onSubmitEditing` 均不生效（RN 行为），Enter 由 `onKeyPress` 接管。#### Pattern C: Debounce — Stopped Typing (Auto-Save / Search)
 
 No built-in `isComplete` prop on TextInput. Use debounce to detect when the user **stops typing** for a defined pause.
 
@@ -493,5 +476,5 @@ function FormScreen() {
 - ❌ Waiting for a native `isComplete` callback — RN TextInput has no such prop, use JS debounce
 - ❌ `onSubmitEditing` without `returnKeyType` — keyboard button shows default "return" instead of "Search"/"Done"/"Send"
 - ❌ Missing `Keyboard.dismiss()` in `onSubmitEditing` — keyboard stays open after submit on some platforms
-- ❌ CJK 输入法选字 Enter 误触 `onSubmitEditing` — 必须用 `isComposingRef` + `onCompositionStart/End` 过滤
+- ❌ CJK 输入法选字 Enter 误触 `onSubmitEditing` — 用 `nativeEvent.isComposing` 过滤，不需要手动维护 ref + `onCompositionStart/End`
 - ❌ `multiline` 下用了 `onSubmitEditing` / `returnKeyType` — 这两个 prop 对 multiline TextInput 不生效，改用 `onKeyPress` 拦截 Enter
