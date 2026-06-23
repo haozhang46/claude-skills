@@ -80,6 +80,8 @@ npx why-is-node-running
 
 #### GC 架构
 
+> **V8 GC 不是引用计数，是标记清除（Mark-Sweep）。** 对象能否回收取决于是否「可达」（reachable），而不是有没有被引用。局部变量退出作用域后自动不可达，无需手动干预。
+
 ```
 V8 堆
 ├── Young Generation（新生代）— Scavenge 算法，频繁 GC
