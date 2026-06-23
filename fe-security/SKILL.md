@@ -1,6 +1,6 @@
 ---
 name: fe-security
-description: Use when implementing authentication, handling user input, configuring CORS/CSP, or reviewing frontend security — covers XSS, CSRF, token storage, CSP, clickjacking, IDOR, and dependency auditing
+description: Frontend security — XSS, form encoding, CSRF, token storage, CSP, CORS, IDOR, iframe postMessage, dependency audit
 ---
 
 # Frontend Security
@@ -186,6 +186,129 @@ app.use('/api/users/:id', rateLimit({
 
 **URL 里有 ID 本身不是漏洞**（RESTful API 本来就长这样）。真正的漏洞是**后端没有校验当前用户是否有权访问这个 ID 对应的资源**。前端能做的只是辅助（不暴露多余信息），真正防线在后端。
 
+---
+
+## 9. 表单编码 — HTML Entity / URL / XSS
+
+### 编码场景
+
+| 场景 | 编码方式 | 示例 |
+|------|---------|------|
+| HTML 内容中显示 | HTML Entity | `&lt;script&gt;` |
+| HTML 属性中显示 | HTML Entity + 引号转义 | `&quot;` `&#39;` |
+| URL 参数中传递 | URL 编码 | `%3Cscript%3E` |
+| JSON 中传递 | JSON 序列化（内置转义） | `\u003Cscript\u003E` |
+
+### 使用 `xss` npm 包
+
+```bash
+npm install xss
+```
+
+```js
+const xss = require('xss');
+
+xss('<script>alert(1)</script>');                                // 全过滤
+xss(userInput, { whiteList: { b: [], i: [], a: ['href'] } });    // 白名单
+xss(userInput, { whiteList: {} });                                // 纯文本
+```
+
+| 能力 | `xss` 包 | 手动转义 |
+|------|---------|---------|
+| `<script>` 转义 | ✅ | ✅ |
+| 事件属性（`onerror=`） | ✅ | ❌ |
+| `javascript:` 协议 | ✅ | ❌ |
+| CSS 注入 | ✅ | ❌ |
+| 白名单标签 | ✅ | ❌ |
+
+### DOMPurify
+
+```tsx
+import DOMPurify from 'dompurify';
+<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(userInput, {
+  ALLOWED_TAGS: ['b', 'i', 'em', 'a', 'p'],
+  ALLOWED_ATTR: ['href', 'target'],
+}) }} />
+```
+
+### URL 编码
+
+```js
+// ✅ 参数值必须编码
+fetch(`/api/search?q=${encodeURIComponent(userInput)}`);
+
+// ❌ 手动拼 form 数据
+const formData = `name=${userInput}`;
+
+// ✅ URLSearchParams（自动编码）
+const params = new URLSearchParams();
+params.append('name', userInput);
+```
+
+| API | 自动编码 | 文件 |
+|-----|---------|------|
+| `URLSearchParams` | ✅ | ❌ |
+| `FormData` | ✅ | ✅ |
+| 手动拼接 | ❌ | ❌ |
+
+### 常见 XSS 注入点
+
+```tsx
+// ❌ 属性注入
+<img src={userInput} />    // " onfocus="alert(1)
+
+// ❌ javascript: 协议
+<a href={userInput}>链接</a>
+
+// ✅ 协议白名单
+function safeUrl(url) {
+  const allowed = ['http:', 'https:', 'mailto:', 'tel:'];
+  try { const p = new URL(url); return allowed.includes(p.protocol) ? url : '#'; }
+  catch { return '#'; }
+}
+```
+
+### 编码对比表
+
+| 输入 `<script>alert(1)</script>` | 输出 | 安全 |
+|---|---|---|
+| 不处理 | 弹窗 | ❌ |
+| React `{input}` | 显示文本 | ✅ |
+| `xss(input)` | `&lt;script&gt;` | ✅ |
+| `encodeURIComponent(input)` | `%3Cscript%3E` | ✅ |
+| `DOMPurify.sanitize(input)` | 空（白名单外） | ✅ |
+
+---
+
+## 10. iframe postMessage — 域名白名单
+
+```tsx
+// 父页面 → iframe（必须指定 targetOrigin）
+iframeRef.current?.contentWindow?.postMessage(data, 'https://trusted.com');
+// ❌ postMessage(data, '*')
+```
+
+```tsx
+// 父页面 ← iframe（校验 event.origin）
+const ALLOWED = ['https://trusted-app.example.com'];
+useEffect(() => {
+  const handler = (e: MessageEvent) => {
+    if (!ALLOWED.includes(e.origin)) return;   // 1️⃣ 域名白名单
+    if (!e.data?.type) return;                  // 2️⃣ 结构校验
+    switch (e.data.type) { /* 3️⃣ 分发 */ }
+  };
+  window.addEventListener('message', handler);
+  return () => window.removeEventListener('message', handler);
+}, []);
+```
+
+| 做法 | 风险 |
+|------|------|
+| `postMessage(data, '*')` | 任何窗口能收到 |
+| 不校验 `event.origin` | 任意网站伪造消息 |
+| 不校验 `data` 结构 | Prototype pollution |
+| 只校验 `event.source` | 可伪造 |
+
 ## Red Flags
 
 - `localStorage.getItem('token')` — migrate to httpOnly cookie
@@ -194,3 +317,8 @@ app.use('/api/users/:id', rateLimit({
 - No CSP header on the page
 - `eval()` or `new Function()` anywhere near user input
 - JWT stored in sessionStorage — still readable by XSS
+- `href={userInput}` 不校验 → `javascript:` 协议 XSS
+- 手动拼 URL 参数不 `encodeURIComponent` → 参数注入
+- 前端编码就够了，后端不需要 → 后端也必须编码/校验
+- `postMessage(data, '*')` → 必须指定具体域名
+- `message` 事件不校验 `event.origin` → 任意网站伪造消息
