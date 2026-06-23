@@ -122,6 +122,79 @@ Pseudo-classes (`&:hover`) and pseudo-elements (`&::after`) may still use `&` si
 - No mental compile step — what you see in CSS is what you search in HTML
 - `&__` / `&--` shortcuts remain banned because they break grep-ability
 
+## Responsive Breakpoints — BEM Modifier + Mobile First
+
+Use BEM modifier classes (`--tablet`, `--desktop`, `--wide`) for responsive variants.
+Mobile is the default (no modifier needed).
+
+| Breakpoint | Modifier | Min width |
+|-----------|----------|-----------|
+| **Mobile** (default) | *(none)* | 0 |
+| **Pad** | `--tablet` | 768px |
+| **Desktop** | `--desktop` | 1024px |
+| **Wide** | `--wide` | 1280px |
+
+```css
+/* ✅ CSS — mobile base + BEM modifier overrides */
+.post-card {
+  @apply p-4 text-sm;           /* mobile base */
+}
+
+@media (min-width: 768px) {
+  .post-card--tablet {
+    @apply p-6 text-base;       /* tablet+ overrides */
+  }
+}
+
+@media (min-width: 1024px) {
+  .post-card--desktop {
+    @apply p-8 text-lg;         /* desktop+ overrides */
+  }
+}
+
+@media (min-width: 1280px) {
+  .post-card--wide {
+    @apply p-10 text-xl;        /* wide overrides */
+  }
+}
+```
+
+In React, use `useMediaQuery` (from ahooks) + clsx to apply the right modifier:
+
+```tsx
+// ✅ JSX — clsx + useMediaQuery
+import { useMediaQuery } from 'ahooks';
+import cn from 'classnames';
+
+function PostCard() {
+  const isTablet  = useMediaQuery('(min-width: 768px)');
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const isWide    = useMediaQuery('(min-width: 1280px)');
+
+  const breakpoint = isWide ? 'post-card--wide'
+                  : isDesktop ? 'post-card--desktop'
+                  : isTablet ? 'post-card--tablet'
+                  : '';
+
+  return (
+    <div className={cn('post-card', breakpoint)}>
+      ...
+    </div>
+  );
+}
+```
+
+```tsx
+// ❌ FORBIDDEN — Tailwind responsive prefixes in className
+<div className="p-4 md:p-6 lg:p-8 xl:p-10">
+```
+
+**Why:**
+- BEM modifiers express the responsive variant directly in the selector name
+- `grep post-card--tablet` finds exactly where tablet styles are defined
+- Mobile-first keeps the base clean; each modifier only adds what changes
+- No Tailwind responsive prefixes in HTML — all breakpoint logic is in CSS
+
 ## Conditional Class → classnames / clsx — No Template Ternaries
 
 ```tsx
